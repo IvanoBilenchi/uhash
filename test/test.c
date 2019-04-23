@@ -1,154 +1,201 @@
 /** @file
  * Tests for the uHash library.
  *
- * @author Attractive Chaos (khash)
- * @author Ivano Bilenchi (uhash)
+ * @author Ivano Bilenchi
  *
- * @copyright Copyright (c) 2008, 2009, 2011 Attractive Chaos <attractor@live.co.uk>
  * @copyright Copyright (c) 2019 Ivano Bilenchi <https://ivanobilenchi.com>
  * @copyright SPDX-License-Identifier: MIT
  */
 
 #include <stdio.h>
-#include <assert.h>
-#include <limits.h>
-#include <time.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "uhash.h"
 
-UHASH_INIT(str, char*, char, 0, uhash_str_hash, uhash_str_equals)
-UHASH_INIT(int, uint32_t, unsigned char, 1, uhash_int32_hash, uhash_identical)
+/// @name Utility macros
 
-typedef struct {
-    unsigned key;
-    unsigned char val;
-} int_unpack_t;
+#define array_size(array) (sizeof(array) / sizeof(*array))
 
-typedef struct {
-    unsigned key;
-    unsigned char val;
-} __attribute__ ((__packed__)) int_packed_t;
+#define uhash_assert(exp) do {                                                                      \
+    if (!(exp)) {                                                                                   \
+        printf("Test failed: %s, line %d (%s)\n", __func__, __LINE__, #exp);                        \
+        return false;                                                                               \
+    }                                                                                               \
+} while(0)
 
-#define hash_eq(a, b) ((a).key == (b).key)
-#define hash_func(a) ((a).key)
+/// @name Type definitions
 
-UHASH_INIT(iun, int_unpack_t, char, 0, hash_func, hash_eq)
-UHASH_INIT(ipk, int_packed_t, char, 0, hash_func, hash_eq)
+UHASH_SET_INIT(IntSet, uint32_t, uhash_int32_hash, uhash_identical)
+UHASH_MAP_INIT(IntMap, uint32_t, uint32_t, uhash_int32_hash, uhash_identical)
 
-static int data_size = 5000000;
-static unsigned *int_data;
-static char **str_data;
+static bool test_memory(void) {
+    UHash(IntSet) *set = uhash_alloc(IntSet);
+    uhash_ret_t ret;
+    uhash_put(IntSet, set, 0, &ret);
+    uhash_assert(uhash_count(set) == 1);
 
-void ht_init_data()
-{
-    int i;
-    char buf[256];
-    uint32_t x = 11;
-    printf("--- generating data... ");
-    int_data = (unsigned*)calloc(data_size, sizeof(unsigned));
-    str_data = (char**)calloc(data_size, sizeof(char*));
-    for (i = 0; i < data_size; ++i) {
-        int_data[i] = (unsigned)(data_size * ((double)x / UINT_MAX) / 4) * 271828183u;
-        sprintf(buf, "%x", int_data[i]);
-        str_data[i] = strdup(buf);
-        x = 1664525L * x + 1013904223L;
+    uhash_uint_t buckets = set->n_buckets;
+    uhash_resize(IntSet, set, 200);
+    uhash_assert(set->n_buckets > buckets);
+
+    buckets = set->n_buckets;
+    uhash_resize(IntSet, set, 100);
+    uhash_assert(set->n_buckets < buckets);
+
+    buckets = set->n_buckets;
+    uhash_clear(IntSet, set);
+    uhash_assert(set->n_buckets == buckets);
+    uhash_assert(uhash_count(set) == 0);
+
+    uhash_free(IntSet, set);
+    return true;
+}
+
+/// @name Tests
+
+static bool test_base(void) {
+    uint32_t const max = 100;
+    UHash(IntSet) *set = uhash_alloc(IntSet);
+
+    for (uint32_t i = 0; i < max; ++i) {
+        uhash_ret_t ret;
+        uhash_put(IntSet, set, i, &ret);
+        uhash_assert(ret == UHASH_INSERTED);
     }
-    printf("done!\n");
-}
 
-void ht_destroy_data()
-{
-    int i;
-    for (i = 0; i < data_size; ++i) free(str_data[i]);
-    free(str_data); free(int_data);
-}
+    uhash_assert(uhash_count(set) == max);
 
-void ht_uhash_int()
-{
-    int i, ret;
-    unsigned *data = int_data;
-    UHash(int) *h;
-    unsigned k;
-
-    h = uhash_alloc(int);
-    for (i = 0; i < data_size; ++i) {
-        k = uhash_put(int, h, data[i], &ret);
-        uhash_value(h, k) = i&0xff;
-        if (!ret) uhash_delete(int, h, k);
+    for (uint32_t i = 0; i < max; ++i) {
+        uhash_uint_t idx = uhash_get(IntSet, set, i);
+        uhash_assert(idx != UHASH_INDEX_MISSING);
+        uhash_assert(uhash_exists(set, idx));
     }
-    printf("[ht_uhash_int] size: %u\n", uhash_count(h));
-    uhash_free(int, h);
-}
 
-void ht_uhash_str()
-{
-    int i, ret;
-    char **data = str_data;
-    UHash(str) *h;
-    unsigned k;
+    uhash_assert(uhash_get(IntSet, set, 200) == UHASH_INDEX_MISSING);
 
-    h = uhash_alloc(str);
-    for (i = 0; i < data_size; ++i) {
-        k = uhash_put(str, h, data[i], &ret);
-        if (!ret) uhash_delete(str, h, k);
+    for (uint32_t i = 0; i < max; ++i) {
+        uhash_uint_t idx = uhash_get(IntSet, set, i);
+        uhash_delete(IntSet, set, idx);
+        uhash_assert(!uhash_exists(set, idx));
+        uhash_assert(uhash_get(IntSet, set, i) == UHASH_INDEX_MISSING);
     }
-    printf("[ht_uhash_int] size: %u\n", uhash_count(h));
-    uhash_free(str, h);
+
+    uhash_assert(uhash_count(set) == 0);
+
+    uhash_free(IntSet, set);
+    return true;
 }
 
-void ht_uhash_unpack()
-{
-    int i, ret;
-    unsigned *data = int_data;
-    UHash(iun) *h;
-    unsigned k;
+static bool test_map(void) {
+    uint32_t const max = 100;
+    UHash(IntMap) *map = uhash_alloc(IntMap);
 
-    h = uhash_alloc(iun);
-    for (i = 0; i < data_size; ++i) {
-        int_unpack_t x;
-        x.key = data[i]; x.val = i&0xff;
-        k = uhash_put(iun, h, x, &ret);
-        if (!ret) uhash_delete(iun, h, k);
+    for (uint32_t i = 0; i < max; ++i) {
+        uhash_assert(uhmap_overwrite(IntMap, map, i, i) == UHASH_INSERTED);
     }
-    printf("[ht_uhash_unpack] size: %u (sizeof=%ld)\n", uhash_count(h), sizeof(int_unpack_t));
-    uhash_free(iun, h);
-}
 
-void ht_uhash_packed()
-{
-    int i, ret;
-    unsigned *data = int_data;
-    UHash(ipk) *h;
-    unsigned k;
+    uint32_t existing_val;
+    uhash_assert(uhmap_set(IntMap, map, 0, 0, &existing_val) == UHASH_PRESENT);
+    uhash_assert(existing_val == 0);
 
-    h = uhash_alloc(ipk);
-    for (i = 0; i < data_size; ++i) {
-        int_packed_t x;
-        x.key = data[i]; x.val = i&0xff;
-        k = uhash_put(ipk, h, x, &ret);
-        if (!ret) uhash_delete(ipk, h, k);
+    uhash_assert(uhmap_add(IntMap, map, 0, 1, &existing_val) == UHASH_PRESENT);
+    uhash_assert(existing_val == 0);
+
+    uhash_assert(uhmap_add(IntMap, map, max, max, &existing_val) == UHASH_INSERTED);
+    uhash_assert(uhmap_remove(IntMap, map, max));
+
+    for (uint32_t i = 0; i < max; ++i) {
+        uint32_t existing_key;
+        uhash_assert(uhmap_pop(IntMap, map, i, &existing_key, &existing_val));
+        uhash_assert(existing_key == i);
+        uhash_assert(existing_val == i);
     }
-    printf("[ht_uhash_packed] size: %u (sizeof=%ld)\n", uhash_count(h), sizeof(int_packed_t));
-    uhash_free(ipk, h);
+
+    uhash_free(IntMap, map);
+    return true;
 }
 
-void ht_timing(void (*f)(void))
-{
-    clock_t t = clock();
-    (*f)();
-    printf("[ht_timing] %.3lf sec\n", (double)(clock() - t) / CLOCKS_PER_SEC);
+static bool test_set(void) {
+    uint32_t const max = 100;
+    UHash(IntSet) *set = uhash_alloc(IntSet);
+    uhash_ret_t ret;
+    
+    for (uint32_t i = 0; i < max; ++i) {
+        ret = uhset_insert(IntSet, set, i);
+        uhash_assert(ret == UHASH_INSERTED);
+    }
+
+    uhash_assert(uhset_insert(IntSet, set, 0) == UHASH_PRESENT);
+    uhash_assert(uhash_count(set) == max);
+
+    for (uint32_t i = 0; i < max; ++i) {
+        uint32_t existing;
+        ret = uhset_insert_get_existing(IntSet, set, i, &existing);
+        uhash_assert(ret == UHASH_PRESENT);
+        uhash_assert(existing == i);
+    }
+
+    uint32_t elements[max + 1] = {};
+    for (uint32_t i = 0; i < max + 1; ++i) {
+        elements[i] = i;
+    }
+
+    ret = uhset_insert_all(IntSet, set, elements, max);
+    uhash_assert(ret == UHASH_PRESENT);
+
+    ret = uhset_insert_all(IntSet, set, elements, max + 1);
+    uhash_assert(ret == UHASH_INSERTED);
+
+    uhash_assert(uhash_contains(IntSet, set, max));
+    uhash_assert(uhset_remove(IntSet, set, max));
+    uhash_assert(!uhash_contains(IntSet, set, max));
+
+    for (uint32_t i = 0; i < max; ++i) {
+        uint32_t existing;
+        uhash_assert(uhset_pop(IntSet, set, i, &existing));
+        uhash_assert(existing == i);
+    }
+
+    UHash(IntSet) *other_set = uhash_alloc(IntSet);
+    uhset_insert_all(IntSet, set, elements, max);
+    uhset_insert_all(IntSet, other_set, elements, max / 2);
+
+    uhash_assert(uhset_is_superset(IntSet, set, other_set));
+    uhash_assert(!uhset_is_superset(IntSet, other_set, set));
+
+    uhash_assert(!uhset_equals(IntSet, set, other_set));
+    uhset_insert_all(IntSet, other_set, elements, max);
+    uhash_assert(uhset_equals(IntSet, set, other_set));
+
+    uint32_t element = uhset_get_any(IntSet, set, max);
+    uhash_assert(element != max);
+
+    uhash_clear(IntSet, set);
+    element = uhset_get_any(IntSet, set, max);
+    uhash_assert(element == max);
+
+    uhash_free(IntSet, set);
+    return true;
 }
 
-int main(int argc, char *argv[])
-{
-    if (argc > 1) data_size = atoi(argv[1]);
-    ht_init_data();
-    ht_timing(ht_uhash_int);
-    ht_timing(ht_uhash_str);
-    ht_timing(ht_uhash_unpack);
-    ht_timing(ht_uhash_packed);
-    ht_destroy_data();
-    return 0;
+int main(void) {
+    printf("Starting tests...\n");
+    
+    int exit_code = EXIT_SUCCESS;
+    bool (*tests[])(void) = {
+        test_memory,
+        test_base,
+        test_map,
+        test_set
+    };
+
+    for (uint32_t i = 0; i < array_size(tests); ++i) {
+        if (!tests[i]()) exit_code = EXIT_FAILURE;
+    }
+
+    if (exit_code == EXIT_SUCCESS) {
+        printf("All tests passed.\n");
+    } else {
+        printf("Some tests failed.\n");
+    }
+    
+    return exit_code;
 }
