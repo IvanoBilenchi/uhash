@@ -93,20 +93,41 @@ typedef enum uhash_ret_t {
 #define __uhf_set_isboth_false(flag, i) (flag[i >> 4u] &= ~(3ul << ((i & 0xfu) << 1u)))
 #define __uhf_set_isdel_true(flag, i) (flag[i >> 4u] |= 1ul << ((i & 0xfu) << 1u))
 
+/// Updates x so it matches the next power of two.
 #define __uhash_uint_next_power_2(x) (                                                              \
     --(x),                                                                                          \
     (x)|=(x)>>1u, (x)|=(x)>>2u, (x)|=(x)>>4u, (x)|=(x)>>8u, (x)|=(x)>>16u,                          \
     ++(x)                                                                                           \
 )
 
+/**
+ * Computes the maximum number of elements that the table can contain
+ * before it needs to be resized in order to keep its load factor under UHASH_MAX_LOAD.
+ *
+ * @param n_buckets [uhash_uint_t] Number of buckets.
+ * @return [uhash_uint_t] Upper bound.
+ */
 #define __uhash_upper_bound(n_buckets) ((uhash_uint_t)((n_buckets) * UHASH_MAX_LOAD + 0.5))
 
+/**
+ * Karl Nelson <kenelson@ece.ucdavis.edu>'s X31 string hash function.
+ *
+ * @param key [char const *] The string to hash.
+ * @return [uhash_hash_t] The hash value.
+ */
 __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
     uhash_hash_t h = (uhash_hash_t)*key;
     if (h) for (++key ; *key; ++key) h = (h << 5u) - h + (uhash_hash_t)(*key);
     return h;
 }
 
+/**
+ * Defines a new hash table type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param uhkey_t [type] Hash table key type.
+ * @param uhval_t [type] Hash table value type.
+ */
 #define __UHASH_DEF_TYPE(T, uhkey_t, uhval_t)                                                       \
     typedef uhkey_t uhash_##T##_key;                                                                \
     typedef uhkey_t uhash_##T##_val;                                                                \
@@ -119,6 +140,13 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
         uhval_t *vals;                                                                              \
     } UHash_##T;
 
+/**
+ * Generates function declarations for the specified hash table type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param SCOPE [scope] Scope of the declarations.
+ * @param uhkey_t [type] Hash table key type.
+ */
 #define __UHASH_DECL(T, SCOPE, uhkey_t)                                                             \
     SCOPE UHash_##T *uhash_alloc_##T(void);                                                         \
     SCOPE void uhash_free_##T(UHash_##T *h);                                                        \
@@ -128,12 +156,27 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
     SCOPE uhash_uint_t uhash_put_##T(UHash_##T *h, uhkey_t key, uhash_ret_t *ret);                  \
     SCOPE void uhash_delete_##T(UHash_##T *h, uhash_uint_t x);
 
+/**
+ * Generates function declarations for the specified hash map type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param SCOPE [scope] Scope of the declarations.
+ * @param uhkey_t [type] Hash table key type.
+ * @param uhval_t [type] Hash table value type.
+ */
 #define __UHASH_MAP_DECL(T, SCOPE, uhkey_t, uhval_t)                                                \
     SCOPE uhval_t uhmap_get_##T(UHash_##T const *h, uhkey_t key, uhval_t if_missing);               \
     SCOPE uhash_ret_t uhmap_set_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *existing);   \
     SCOPE uhash_ret_t uhmap_add_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *existing);   \
     SCOPE bool uhmap_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *r_key, uhval_t *r_val);
 
+/**
+ * Generates function declarations for the specified hash set type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param SCOPE [scope] Scope of the declarations.
+ * @param uhkey_t [type] Hash table key type.
+ */
 #define __UHASH_SET_DECL(T, SCOPE, uhkey_t)                                                         \
     SCOPE uhash_ret_t uhset_insert_##T(UHash_##T *h, uhkey_t key, uhkey_t *existing);               \
     SCOPE uhash_ret_t uhset_insert_all_##T(UHash_##T *h, uhkey_t const *items, uhash_uint_t n);     \
@@ -142,6 +185,17 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
     SCOPE uhash_hash_t uhset_hash_##T(UHash_##T const *h);                                          \
     SCOPE uhkey_t uhset_get_any_##T(UHash_##T const *h, uhkey_t if_empty);
 
+/**
+ * Generates function definitions for the specified hash table type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param SCOPE [scope] Scope of the definitions.
+ * @param uhkey_t [type] Hash table key type.
+ * @param uhval_t [type] Hash table value type.
+ * @param uhash_map [bool] True for map types, false for set types.
+ * @param __hash_func [(uhkey_t) -> uhash_hash_t] Hash function.
+ * @param __equal_func [(uhkey_t, uhkey_t) -> bool] Equality function.
+ */
 #define __UHASH_IMPL(T, SCOPE, uhkey_t, uhval_t, uhash_map, __hash_func, __equal_func)              \
                                                                                                     \
     SCOPE UHash_##T *uhash_alloc_##T(void) {                                                        \
@@ -352,6 +406,14 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
         }                                                                                           \
     }
 
+/**
+ * Generates function definitions for the specified hash map type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param SCOPE [scope] Scope of the definitions.
+ * @param uhkey_t [type] Hash table key type.
+ * @param uhval_t [type] Hash table value type.
+ */
 #define __UHASH_MAP_IMPL(T, SCOPE, uhkey_t, uhval_t)                                                \
                                                                                                     \
     SCOPE uhval_t uhmap_get_##T(UHash_##T const *h, uhkey_t key, uhval_t if_missing) {              \
@@ -397,6 +459,14 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
         return true;                                                                                \
     }
 
+/**
+ * Generates function definitions for the specified hash set type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param SCOPE [scope] Scope of the definitions.
+ * @param uhkey_t [type] Hash table key type.
+ * @param __hash_func [(uhkey_t) -> uhash_hash_t] Hash function.
+ */
 #define __UHASH_SET_IMPL(T, SCOPE, uhkey_t, __hash_func)                                            \
                                                                                                     \
     SCOPE uhash_ret_t uhset_insert_##T(UHash_##T *h, uhkey_t key, uhkey_t *existing) {              \
