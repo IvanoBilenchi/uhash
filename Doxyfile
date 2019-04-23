@@ -4,7 +4,7 @@
 # Project related configuration options
 #---------------------------------------------------------------------------
 DOXYFILE_ENCODING      = UTF-8
-PROJECT_NAME           = "uHash(T)"
+PROJECT_NAME           = "uHash"
 PROJECT_NUMBER         = "1.0.0"
 PROJECT_BRIEF          = "A type-safe, generic C hash table."
 PROJECT_LOGO           =
