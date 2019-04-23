@@ -23,33 +23,35 @@
 /// Unsigned integer type.
 #define uhash_uint_t uint32_t
 
+/// Maximum value of a uhash_uint_t variable.
+#define UHASH_UINT_MAX UINT32_MAX
+
 /// Return type for hash functions.
 #define uhash_hash_t uint32_t
 
-#define __uhash_flags_t uint32_t
-#define __uhash_uint_next_power_2(x) (                                                              \
-    --(x),                                                                                          \
-    (x)|=(x)>>1u, (x)|=(x)>>2u, (x)|=(x)>>4u, (x)|=(x)>>8u, (x)|=(x)>>16u,                          \
-    ++(x)                                                                                           \
-)
-
-/// Return code for uhash_put.
+/// Return codes for functions that add elements to the hash table.
 typedef enum uhash_ret_t {
 
-    /// The operation failed.
+    /// The operation failed (as of right now it can only happen if *alloc returns NULL).
     UHASH_ERROR = -1,
 
-    /// The specified key is already present.
+    /// The key is already present.
     UHASH_PRESENT = 0,
 
-    /// The key has been inserted.
+    /// The key has been inserted (it was absent).
     UHASH_INSERTED = 1
 
 } uhash_ret_t;
 
 /// @name Constants
 
-static double const __ac_HASH_UPPER = 0.77;
+/// Index returned when a key is not present in the hash table.
+#define UHASH_INDEX_MISSING UHASH_UINT_MAX
+
+/// Hash table maximum load factor.
+#ifndef UHASH_MAX_LOAD
+    #define UHASH_MAX_LOAD 0.77
+#endif
 
 /// @name Private API and Implementation
 
@@ -81,39 +83,27 @@ static double const __ac_HASH_UPPER = 0.77;
     #define __uhash_analyzer_assert(c)
 #endif
 
-#define __ac_isempty(flag, i) ((flag[i>>4]>>((i&0xfU)<<1))&2)
-#define __ac_isdel(flag, i) ((flag[i>>4]>>((i&0xfU)<<1))&1)
-#define __ac_iseither(flag, i) ((flag[i>>4]>>((i&0xfU)<<1))&3)
-#define __ac_set_isdel_false(flag, i) (flag[i>>4]&=~(1ul<<((i&0xfU)<<1)))
-#define __ac_set_isempty_false(flag, i) (flag[i>>4]&=~(2ul<<((i&0xfU)<<1)))
-#define __ac_set_isboth_false(flag, i) (flag[i>>4]&=~(3ul<<((i&0xfU)<<1)))
-#define __ac_set_isdel_true(flag, i) (flag[i>>4]|=1ul<<((i&0xfU)<<1))
+/// Flags manipulation macros.
+#define __uhf_size(m) ((m) < 16 ? 1 : (m) >> 4u)
+#define __uhf_isempty(flag, i) ((flag[i >> 4u] >> ((i & 0xfu) << 1u)) & 2u)
+#define __uhf_isdel(flag, i) ((flag[i >> 4u] >> ((i & 0xfu) << 1u)) & 1u)
+#define __uhf_iseither(flag, i) ((flag[i >> 4u] >> ((i & 0xfu) << 1u)) & 3u)
+#define __uhf_set_isdel_false(flag, i) (flag[i >> 4u] &= ~(1ul << ((i & 0xfu) << 1u)))
+#define __uhf_set_isempty_false(flag, i) (flag[i >> 4u] &= ~(2ul << ((i & 0xfu) << 1u)))
+#define __uhf_set_isboth_false(flag, i) (flag[i >> 4u] &= ~(3ul << ((i & 0xfu) << 1u)))
+#define __uhf_set_isdel_true(flag, i) (flag[i >> 4u] |= 1ul << ((i & 0xfu) << 1u))
 
-#define __ac_fsize(m) ((m) < 16? 1 : (m)>>4)
+#define __uhash_uint_next_power_2(x) (                                                              \
+    --(x),                                                                                          \
+    (x)|=(x)>>1u, (x)|=(x)>>2u, (x)|=(x)>>4u, (x)|=(x)>>8u, (x)|=(x)>>16u,                          \
+    ++(x)                                                                                           \
+)
 
-/// @cond
-
-#ifndef kcalloc
-    #define kcalloc(N,Z) calloc(N,Z)
-#endif
-
-#ifndef kmalloc
-    #define kmalloc(Z) malloc(Z)
-#endif
-
-#ifndef krealloc
-    #define krealloc(P,Z) realloc(P,Z)
-#endif
-
-#ifndef kfree
-    #define kfree(P) free(P)
-#endif
-
-/// @endcond
+#define __uhash_upper_bound(n_buckets) ((uhash_uint_t)((n_buckets) * UHASH_MAX_LOAD + 0.5))
 
 __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
     uhash_hash_t h = (uhash_hash_t)*key;
-    if (h) for (++key ; *key; ++key) h = (h << 5) - h + (uhash_hash_t)*key;
+    if (h) for (++key ; *key; ++key) h = (h << 5u) - h + (uhash_hash_t)(*key);
     return h;
 }
 
@@ -122,95 +112,110 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
     typedef uhkey_t uhash_##T##_val;                                                                \
     typedef struct UHash_##T {                                                                      \
         uhash_uint_t n_buckets;                                                                     \
-        uhash_uint_t count;                                                                         \
         uhash_uint_t n_occupied;                                                                    \
-        uhash_uint_t upper_bound;                                                                   \
-        __uhash_flags_t *flags;                                                                     \
+        uhash_uint_t count;                                                                         \
+        uint32_t *flags;                                                                            \
         uhkey_t *keys;                                                                              \
         uhval_t *vals;                                                                              \
     } UHash_##T;
 
-#define __UHASH_DECL(T, SCOPE, uhkey_t, uhval_t)                                                    \
+#define __UHASH_DECL(T, SCOPE, uhkey_t)                                                             \
     SCOPE UHash_##T *uhash_alloc_##T(void);                                                         \
     SCOPE void uhash_free_##T(UHash_##T *h);                                                        \
     SCOPE void uhash_clear_##T(UHash_##T *h);                                                       \
-    SCOPE uhash_uint_t uhash_get_##T(const UHash_##T *h, uhkey_t key);                              \
+    SCOPE uhash_uint_t uhash_get_##T(UHash_##T const *h, uhkey_t key);                              \
     SCOPE bool uhash_resize_##T(UHash_##T *h, uhash_uint_t new_n_buckets);                          \
     SCOPE uhash_uint_t uhash_put_##T(UHash_##T *h, uhkey_t key, uhash_ret_t *ret);                  \
     SCOPE void uhash_delete_##T(UHash_##T *h, uhash_uint_t x);
 
+#define __UHASH_MAP_DECL(T, SCOPE, uhkey_t, uhval_t)                                                \
+    SCOPE uhval_t uhmap_get_##T(UHash_##T const *h, uhkey_t key, uhval_t if_missing);               \
+    SCOPE uhash_ret_t uhmap_set_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *existing);   \
+    SCOPE uhash_ret_t uhmap_add_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *existing);   \
+    SCOPE bool uhmap_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *r_key, uhval_t *r_val);
+
+#define __UHASH_SET_DECL(T, SCOPE, uhkey_t)                                                         \
+    SCOPE uhash_ret_t uhset_insert_##T(UHash_##T *h, uhkey_t key, uhkey_t *existing);               \
+    SCOPE uhash_ret_t uhset_insert_all_##T(UHash_##T *h, uhkey_t const *items, uhash_uint_t n);     \
+    SCOPE bool uhset_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *removed);                       \
+    SCOPE bool uhset_is_superset_##T(UHash_##T const *h1, UHash_##T const *h2);                     \
+    SCOPE uhash_hash_t uhset_hash_##T(UHash_##T const *h);                                          \
+    SCOPE uhkey_t uhset_get_any_##T(UHash_##T const *h, uhkey_t if_empty);
+
 #define __UHASH_IMPL(T, SCOPE, uhkey_t, uhval_t, uhash_map, __hash_func, __equal_func)              \
                                                                                                     \
     SCOPE UHash_##T *uhash_alloc_##T(void) {                                                        \
-        return kcalloc(1, sizeof(UHash_##T));                                                       \
+        return calloc(1, sizeof(UHash_##T));                                                        \
     }                                                                                               \
                                                                                                     \
     SCOPE void uhash_free_##T(UHash_##T *h) {                                                       \
-        if (h) {                                                                                    \
-            kfree((void *)h->keys); kfree(h->flags);                                                \
-            kfree((void *)h->vals);                                                                 \
-            kfree(h);                                                                               \
-        }                                                                                           \
+        if (!h) return;                                                                             \
+        free((void *)h->keys);                                                                      \
+        free((void *)h->vals);                                                                      \
+        free(h->flags);                                                                             \
+        free(h);                                                                                    \
     }                                                                                               \
                                                                                                     \
     SCOPE void uhash_clear_##T(UHash_##T *h) {                                                      \
         if (h && h->flags) {                                                                        \
-            memset(h->flags, 0xaa, __ac_fsize(h->n_buckets) * sizeof(*h->flags));                   \
+            memset(h->flags, 0xaa, __uhf_size(h->n_buckets) * sizeof(*h->flags));                   \
             h->count = h->n_occupied = 0;                                                           \
         }                                                                                           \
     }                                                                                               \
                                                                                                     \
-    SCOPE uhash_uint_t uhash_get_##T(const UHash_##T *h, uhkey_t key) {                             \
+    SCOPE uhash_uint_t uhash_get_##T(UHash_##T const *h, uhkey_t key) {                             \
+        __uhash_analyzer_assert(h->vals);                                                           \
         if (!h->n_buckets) return 0;                                                                \
                                                                                                     \
-        uhash_uint_t k, i, last, mask, step = 0;                                                    \
-        mask = h->n_buckets - 1;                                                                    \
-        k = __hash_func(key); i = k & mask;                                                         \
-        last = i;                                                                                   \
+        uhash_uint_t const mask = h->n_buckets - 1;                                                 \
+        uhash_uint_t i = (uhash_uint_t)(__hash_func(key)) & mask;                                   \
+        uhash_uint_t step = 0;                                                                      \
+        uhash_uint_t const last = i;                                                                \
                                                                                                     \
-        while (!__ac_isempty(h->flags, i) &&                                                        \
-               (__ac_isdel(h->flags, i) || !__equal_func(h->keys[i], key))) {                       \
+        while (!__uhf_isempty(h->flags, i) &&                                                       \
+               (__uhf_isdel(h->flags, i) || !__equal_func(h->keys[i], key))) {                      \
             i = (i + (++step)) & mask;                                                              \
-            if (i == last) return h->n_buckets;                                                     \
+            if (i == last) return UHASH_INDEX_MISSING;                                              \
         }                                                                                           \
                                                                                                     \
-        return __ac_iseither(h->flags, i)? h->n_buckets : i;                                        \
+        return __uhf_iseither(h->flags, i) ? UHASH_INDEX_MISSING : i;                               \
     }                                                                                               \
                                                                                                     \
     SCOPE bool uhash_resize_##T(UHash_##T *h, uhash_uint_t new_n_buckets) {                         \
+        __uhash_analyzer_assert(h->vals);                                                           \
         /* Uses (0.25*n_buckets) bytes instead of [sizeof(key_t+val_t)+.25]*n_buckets. */           \
-        __uhash_flags_t *new_flags = 0;                                                             \
+        uint32_t *new_flags = 0;                                                                    \
         uhash_uint_t j = 1;                                                                         \
         {                                                                                           \
             __uhash_uint_next_power_2(new_n_buckets);                                               \
             if (new_n_buckets < 4) new_n_buckets = 4;                                               \
                                                                                                     \
-            if (h->count >= (uhash_uint_t)(new_n_buckets * __ac_HASH_UPPER + 0.5)) {                \
+            if (h->count >= __uhash_upper_bound(new_n_buckets)) {                                   \
                 /* Requested size is too small. */                                                  \
                 j = 0;                                                                              \
             } else {                                                                                \
-                /* Hash table size to be changed (shrink or expand): rehash. */                     \
-                new_flags = kmalloc(__ac_fsize(new_n_buckets) * sizeof(*new_flags));                \
+                /* Hash table size needs to be changed (shrink or expand): rehash. */               \
+                new_flags = malloc(__uhf_size(new_n_buckets) * sizeof(*new_flags));                 \
                 if (!new_flags) return false;                                                       \
                                                                                                     \
-                memset(new_flags, 0xaa, __ac_fsize(new_n_buckets) * sizeof(*new_flags));            \
+                memset(new_flags, 0xaa, __uhf_size(new_n_buckets) * sizeof(*new_flags));            \
                                                                                                     \
                 if (h->n_buckets < new_n_buckets) {                                                 \
                     /* Expand. */                                                                   \
-                    uhkey_t *new_keys = krealloc(h->keys, new_n_buckets * sizeof(*new_keys));       \
+                    uhkey_t *new_keys = realloc(h->keys, new_n_buckets * sizeof(*new_keys));        \
                                                                                                     \
                     if (!new_keys) {                                                                \
-                        kfree(new_flags);                                                           \
+                        free(new_flags);                                                            \
                         return false;                                                               \
                     }                                                                               \
                                                                                                     \
                     h->keys = new_keys;                                                             \
                                                                                                     \
                     if (uhash_map) {                                                                \
-                        uhval_t *new_vals = krealloc(h->vals, new_n_buckets * sizeof(*new_vals));   \
+                        uhval_t *new_vals = realloc(h->vals, new_n_buckets * sizeof(*new_vals));    \
                                                                                                     \
                         if (!new_vals) {                                                            \
-                            kfree(new_flags);                                                       \
+                            free(new_flags);                                                        \
                             return false;                                                           \
                         }                                                                           \
                                                                                                     \
@@ -224,33 +229,28 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
                                                                                                     \
         /* Rehashing is needed. */                                                                  \
         for (j = 0; j != h->n_buckets; ++j) {                                                       \
-            if (__ac_iseither(h->flags, j) != 0) continue;                                          \
+            if (__uhf_iseither(h->flags, j)) continue;                                              \
                                                                                                     \
+            uhash_uint_t const new_mask = new_n_buckets - 1;                                        \
             uhkey_t key = h->keys[j];                                                               \
             uhval_t val;                                                                            \
-            uhash_uint_t new_mask;                                                                  \
-            new_mask = new_n_buckets - 1;                                                           \
-                                                                                                    \
             if (uhash_map) val = h->vals[j];                                                        \
-            __ac_set_isdel_true(h->flags, j);                                                       \
+            __uhf_set_isdel_true(h->flags, j);                                                      \
                                                                                                     \
             while (true) {                                                                          \
                 /* Kick-out process; sort of like in Cuckoo hashing. */                             \
-                uhash_uint_t k, i, step = 0;                                                        \
-                k = __hash_func(key);                                                               \
-                i = k & new_mask;                                                                   \
+                uhash_uint_t i = (uhash_uint_t)(__hash_func(key)) & new_mask;                       \
+                uhash_uint_t step = 0;                                                              \
                                                                                                     \
-                while (!__ac_isempty(new_flags, i)) i = (i + (++step)) & new_mask;                  \
-                __ac_set_isempty_false(new_flags, i);                                               \
+                while (!__uhf_isempty(new_flags, i)) i = (i + (++step)) & new_mask;                 \
+                __uhf_set_isempty_false(new_flags, i);                                              \
                                                                                                     \
-                if (i < h->n_buckets && __ac_iseither(h->flags, i) == 0) {                          \
+                if (i < h->n_buckets && !__uhf_iseither(h->flags, i)) {                             \
                     /* Kick out the existing element. */                                            \
                     { uhkey_t tmp = h->keys[i]; h->keys[i] = key; key = tmp; }                      \
-                    if (uhash_map) {                                                                \
-                        uhval_t tmp = h->vals[i]; h->vals[i] = val; val = tmp;                      \
-                    }                                                                               \
+                    if (uhash_map) { uhval_t tmp = h->vals[i]; h->vals[i] = val; val = tmp; }       \
                     /* Mark it as deleted in the old hash table. */                                 \
-                    __ac_set_isdel_true(h->flags, i);                                               \
+                    __uhf_set_isdel_true(h->flags, i);                                              \
                 } else {                                                                            \
                     /* Write the element and jump out of the loop. */                               \
                     h->keys[i] = key;                                                               \
@@ -262,50 +262,54 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
                                                                                                     \
         if (h->n_buckets > new_n_buckets) {                                                         \
             /* Shrink the hash table. */                                                            \
-            h->keys = krealloc(h->keys, new_n_buckets * sizeof(*h->keys));                          \
-            if (uhash_map) h->vals = krealloc(h->vals, new_n_buckets * sizeof(*h->vals));           \
+            h->keys = realloc(h->keys, new_n_buckets * sizeof(*h->keys));                           \
+            if (uhash_map) h->vals = realloc(h->vals, new_n_buckets * sizeof(*h->vals));            \
         }                                                                                           \
                                                                                                     \
         /* Free the working space. */                                                               \
-        kfree(h->flags);                                                                            \
+        free(h->flags);                                                                             \
         h->flags = new_flags;                                                                       \
         h->n_buckets = new_n_buckets;                                                               \
         h->n_occupied = h->count;                                                                   \
-        h->upper_bound = (uhash_uint_t)(h->n_buckets * __ac_HASH_UPPER + 0.5);                      \
                                                                                                     \
         return true;                                                                                \
     }                                                                                               \
                                                                                                     \
     SCOPE uhash_uint_t uhash_put_##T(UHash_##T *h, uhkey_t key, uhash_ret_t *ret) {                 \
+        __uhash_analyzer_assert(h->vals);                                                           \
         uhash_uint_t x;                                                                             \
-        if (h->n_occupied >= h->upper_bound) {                                                      \
+                                                                                                    \
+        if (h->n_occupied >= __uhash_upper_bound(h->n_buckets)) {                                   \
             /* Update the hash table. */                                                            \
-            if (h->n_buckets > (h->count<<1)) {                                                     \
-                if (uhash_resize_##T(h, h->n_buckets - 1) < 0) {                                    \
+            if (h->n_buckets > (h->count << 1u)) {                                                  \
+                if (!uhash_resize_##T(h, h->n_buckets - 1)) {                                       \
                     /* Clear "deleted" elements. */                                                 \
                     *ret = UHASH_ERROR;                                                             \
-                    return h->n_buckets;                                                            \
+                    return UHASH_INDEX_MISSING;                                                     \
                 }                                                                                   \
-            } else if (uhash_resize_##T(h, h->n_buckets + 1) < 0) {                                 \
+            } else if (!uhash_resize_##T(h, h->n_buckets + 1)) {                                    \
                 /* Expand the hash table. */                                                        \
                 *ret = UHASH_ERROR;                                                                 \
-                return h->n_buckets;                                                                \
+                return UHASH_INDEX_MISSING;                                                         \
             }                                                                                       \
         }                                                                                           \
         /* TODO: implement automatic shrinking; resize() already support shrinking. */              \
         {                                                                                           \
-            uhash_uint_t k, i, site, last, mask = h->n_buckets - 1, step = 0;                       \
-            x = site = h->n_buckets; k = __hash_func(key); i = k & mask;                            \
+            uhash_uint_t const mask = h->n_buckets - 1;                                             \
+            uhash_uint_t i = (uhash_uint_t)(__hash_func(key)) & mask;                               \
+            uhash_uint_t step = 0;                                                                  \
+            uhash_uint_t site = h->n_buckets;                                                       \
+            x = site;                                                                               \
                                                                                                     \
-            if (__ac_isempty(h->flags, i)) {                                                        \
+            if (__uhf_isempty(h->flags, i)) {                                                       \
                 /* Speed up. */                                                                     \
                 x = i;                                                                              \
             } else {                                                                                \
-                last = i;                                                                           \
+                uhash_uint_t const last = i;                                                        \
                                                                                                     \
-                while (!__ac_isempty(h->flags, i) &&                                                \
-                       (__ac_isdel(h->flags, i) || !__equal_func(h->keys[i], key))) {               \
-                    if (__ac_isdel(h->flags, i)) site = i;                                          \
+                while (!__uhf_isempty(h->flags, i) &&                                               \
+                       (__uhf_isdel(h->flags, i) || !__equal_func(h->keys[i], key))) {              \
+                    if (__uhf_isdel(h->flags, i)) site = i;                                         \
                     i = (i + (++step)) & mask;                                                      \
                                                                                                     \
                     if (i == last) {                                                                \
@@ -315,22 +319,22 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
                 }                                                                                   \
                                                                                                     \
                 if (x == h->n_buckets) {                                                            \
-                    x = (__ac_isempty(h->flags, i) && site != h->n_buckets) ? site : i;             \
+                    x = (__uhf_isempty(h->flags, i) && site != h->n_buckets) ? site : i;            \
                 }                                                                                   \
             }                                                                                       \
         }                                                                                           \
                                                                                                     \
-        if (__ac_isempty(h->flags, x)) {                                                            \
+        if (__uhf_isempty(h->flags, x)) {                                                           \
             /* Not present at all. */                                                               \
             h->keys[x] = key;                                                                       \
-            __ac_set_isboth_false(h->flags, x);                                                     \
+            __uhf_set_isboth_false(h->flags, x);                                                    \
             h->count++;                                                                             \
             h->n_occupied++;                                                                        \
             *ret = UHASH_INSERTED;                                                                  \
-        } else if (__ac_isdel(h->flags, x)) {                                                       \
+        } else if (__uhf_isdel(h->flags, x)) {                                                      \
             /* Deleted. */                                                                          \
             h->keys[x] = key;                                                                       \
-            __ac_set_isboth_false(h->flags, x);                                                     \
+            __uhf_set_isboth_false(h->flags, x);                                                    \
             h->count++;                                                                             \
             *ret = UHASH_INSERTED;                                                                  \
         } else {                                                                                    \
@@ -338,14 +342,118 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
             *ret = UHASH_PRESENT;                                                                   \
         }                                                                                           \
                                                                                                     \
-        return x;                                                                                   \
+        return x == h->n_buckets ? UHASH_INDEX_MISSING : x;                                         \
     }                                                                                               \
                                                                                                     \
     SCOPE void uhash_delete_##T(UHash_##T *h, uhash_uint_t x) {                                     \
-        if (x != h->n_buckets && !__ac_iseither(h->flags, x)) {                                     \
-            __ac_set_isdel_true(h->flags, x);                                                       \
+        if (!__uhf_iseither(h->flags, x)) {                                                         \
+            __uhf_set_isdel_true(h->flags, x);                                                      \
             h->count--;                                                                             \
         }                                                                                           \
+    }
+
+#define __UHASH_MAP_IMPL(T, SCOPE, uhkey_t, uhval_t)                                                \
+                                                                                                    \
+    SCOPE uhval_t uhmap_get_##T(UHash_##T const *h, uhkey_t key, uhval_t if_missing) {              \
+        __uhash_analyzer_assert(h->vals);                                                           \
+        uhash_uint_t k = uhash_get_##T(h, key);                                                     \
+        return k == UHASH_INDEX_MISSING ? (if_missing) : h->vals[k];                                \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE uhash_ret_t uhmap_set_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *existing) {  \
+        __uhash_analyzer_assert(h->vals);                                                           \
+        uhash_ret_t ret;                                                                            \
+        uhash_uint_t k = uhash_put_##T(h, key, &ret);                                               \
+                                                                                                    \
+        if (ret != UHASH_ERROR) {                                                                   \
+            if (ret == UHASH_PRESENT && existing) *existing = h->vals[k];                           \
+            h->vals[k] = value;                                                                     \
+        }                                                                                           \
+                                                                                                    \
+        return ret;                                                                                 \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE uhash_ret_t uhmap_add_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *existing) {  \
+        __uhash_analyzer_assert(h->vals);                                                           \
+        uhash_ret_t ret;                                                                            \
+        uhash_uint_t k = uhash_put_##T(h, key, &ret);                                               \
+                                                                                                    \
+        if (ret == UHASH_INSERTED) {                                                                \
+            h->vals[k] = value;                                                                     \
+        } else if (ret == UHASH_PRESENT && existing) {                                              \
+            *existing = h->vals[k];                                                                 \
+        }                                                                                           \
+                                                                                                    \
+        return ret;                                                                                 \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE bool uhmap_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *r_key, uhval_t *r_val) {        \
+        __uhash_analyzer_assert(h->vals);                                                           \
+        uhash_uint_t k = uhash_get_##T(h, key);                                                     \
+        if (k == UHASH_INDEX_MISSING) return false;                                                 \
+        if (r_key) *r_key = h->keys[k];                                                             \
+        if (r_val) *r_val = h->vals[k];                                                             \
+        uhash_delete_##T(h, k);                                                                     \
+        return true;                                                                                \
+    }
+
+#define __UHASH_SET_IMPL(T, SCOPE, uhkey_t, __hash_func)                                            \
+                                                                                                    \
+    SCOPE uhash_ret_t uhset_insert_##T(UHash_##T *h, uhkey_t key, uhkey_t *existing) {              \
+        __uhash_analyzer_assert(h->vals);                                                           \
+        uhash_ret_t ret;                                                                            \
+        uhash_uint_t k = uhash_put_##T(h, key, &ret);                                               \
+        if (ret == UHASH_PRESENT && existing) *existing = h->keys[k];                               \
+        return ret;                                                                                 \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE uhash_ret_t uhset_insert_all_##T(UHash_##T *h, uhkey_t const *items, uhash_uint_t n) {    \
+        __uhash_analyzer_assert(h->vals);                                                           \
+        if (!uhash_resize_##T(h, n)) return UHASH_ERROR;                                            \
+        uhash_ret_t ret = UHASH_PRESENT;                                                            \
+                                                                                                    \
+        for (uhash_uint_t i = 0; i < n; ++i) {                                                      \
+            uhash_ret_t l_ret = uhset_insert_##T(h, items[i], NULL);                                \
+            if (l_ret == UHASH_ERROR) return UHASH_ERROR;                                           \
+            if (l_ret == UHASH_INSERTED) ret = UHASH_INSERTED;                                      \
+        }                                                                                           \
+                                                                                                    \
+        return ret;                                                                                 \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE bool uhset_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *removed) {                      \
+        __uhash_analyzer_assert(h->vals);                                                           \
+        uhash_uint_t k = uhash_get_##T(h, key);                                                     \
+        if (k == UHASH_INDEX_MISSING) return false;                                                 \
+        if (removed) *removed = h->keys[k];                                                         \
+        uhash_delete_##T(h, k);                                                                     \
+        return true;                                                                                \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE bool uhset_is_superset_##T(UHash_##T const *h1, UHash_##T const *h2) {                    \
+        __uhash_analyzer_assert(h1->vals && h2->vals);                                              \
+        for (uhash_uint_t i = 0; i != h2->n_buckets; ++i) {                                         \
+            if (uhash_exists(h2, i) && uhash_get_##T(h1, h2->keys[i]) == UHASH_INDEX_MISSING) {     \
+                return false;                                                                       \
+            }                                                                                       \
+        }                                                                                           \
+        return true;                                                                                \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE uhash_hash_t uhset_hash_##T(UHash_##T const *h) {                                         \
+        __uhash_analyzer_assert(h->vals);                                                           \
+        uhash_hash_t hash = 0;                                                                      \
+        for (uhash_uint_t i = 0; i != h->n_buckets; ++i) {                                          \
+            if (uhash_exists(h, i)) hash ^= __hash_func(h->keys[i]);                                \
+        }                                                                                           \
+        return hash;                                                                                \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE uhkey_t uhset_get_any_##T(UHash_##T const *h, uhkey_t if_empty) {                         \
+        __uhash_analyzer_assert(h->vals);                                                           \
+        uhash_uint_t i = 0;                                                                         \
+        while(i != h->n_buckets && !uhash_exists(h, i)) ++i;                                        \
+        return i == h->n_buckets ? if_empty : h->keys[i];                                           \
     }
 
 /// @name Public API
@@ -353,42 +461,79 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
 /// @name Type definitions
 
 /**
- * Declares a new hash table type.
+ * Declares a new hash map type.
  *
  * @param T [symbol] Hash table name.
  * @param uhkey_t [symbol] Type of the keys.
  * @param uhval_t [symbol] Type of the values.
  */
-#define UHASH_DECL(T, uhkey_t, uhval_t)                                                             \
+#define UHASH_MAP_DECL(T, uhkey_t, uhval_t)                                                         \
     __UHASH_DEF_TYPE(T, uhkey_t, uhval_t)                                                           \
-    __UHASH_DECL(T, uhkey_t, uhval_t)
+    __UHASH_DECL(T, __uhash_unused, uhkey_t)                                                        \
+    __UHASH_MAP_DECL(T, __uhash_unused, uhkey_t, uhval_t)
 
 /**
- * Implements a previously declared hash table type.
+ * Declares a new hash set type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param uhelem_t [symbol] Type of the elements.
+ */
+#define UHASH_SET_DECL(T, uhelem_t)                                                                 \
+    __UHASH_DEF_TYPE(T, uhelem_t, char)                                                             \
+    __UHASH_DECL(T, __uhash_unused, uhelem_t)                                                       \
+    __UHASH_SET_DECL(T, __uhash_unused, uhelem_t)
+
+/**
+ * Implements a previously declared hash map type.
  *
  * @param T [symbol] Hash table name.
  * @param uhkey_t [symbol] Type of the keys.
  * @param uhval_t [symbol] Type of the values.
- * @param uhash_map [bool] True for maps, false for sets.
  * @param __hash_func [(uhkey_t) -> uhash_hash_t] Hash function.
  * @param __equal_func [(uhkey_t, uhkey_t) -> bool] Equality function.
  */
-#define UHASH_IMPL(T, uhkey_t, uhval_t, uhash_map, __hash_func, __equal_func) \
-    __UHASH_IMPL(T, __uhash_unused, uhkey_t, uhval_t, uhash_map, __hash_func, __equal_func)
+#define UHASH_MAP_IMPL(T, uhkey_t, uhval_t, __hash_func, __equal_func)                              \
+    __UHASH_IMPL(T, __uhash_unused, uhkey_t, uhval_t, 1, __hash_func, __equal_func)                 \
+    __UHASH_MAP_IMPL(T, __uhash_unused, uhkey_t, uhval_t)
 
 /**
- * Defines a new static hash table type.
+ * Implements a previously declared hash set type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param uhelem_t [symbol] Type of the elements.
+ * @param __hash_func [(uhelem_t) -> uhash_hash_t] Hash function.
+ * @param __equal_func [(uhelem_t, uhelem_t) -> bool] Equality function.
+ */
+#define UHASH_SET_IMPL(T, uhelem_t, __hash_func, __equal_func)                                      \
+    __UHASH_IMPL(T, __uhash_unused, uhelem_t, char, 0, __hash_func, __equal_func)                   \
+    __UHASH_SET_IMPL(T, __uhash_unused, uhelem_t, __hash_func)
+
+/**
+ * Defines a new static hash map type.
  *
  * @param T [symbol] Hash table name.
  * @param uhkey_t [symbol] Type of the keys.
  * @param uhval_t [symbol] Type of the values.
- * @param uhash_map [bool] True for maps, false for sets.
  * @param __hash_func [(uhkey_t) -> uhash_hash_t] Hash function.
  * @param __equal_func [(uhkey_t, uhkey_t) -> bool] Equality function.
  */
-#define UHASH_INIT(T, uhkey_t, uhval_t, uhash_map, __hash_func, __equal_func)                       \
+#define UHASH_MAP_INIT(T, uhkey_t, uhval_t, __hash_func, __equal_func)                              \
     __UHASH_DEF_TYPE(T, uhkey_t, uhval_t)                                                           \
-    __UHASH_IMPL(T, __uhash_static_inline, uhkey_t, uhval_t, uhash_map, __hash_func, __equal_func)
+    __UHASH_IMPL(T, __uhash_static_inline, uhkey_t, uhval_t, 1, __hash_func, __equal_func)          \
+    __UHASH_MAP_IMPL(T, __uhash_static_inline, uhkey_t, uhval_t)
+
+/**
+ * Defines a new static hash set type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param uhelem_t [symbol] Type of the elements.
+ * @param __hash_func [(uhkey_t) -> uhash_hash_t] Hash function.
+ * @param __equal_func [(uhkey_t, uhkey_t) -> bool] Equality function.
+ */
+#define UHASH_SET_INIT(T, uhelem_t, __hash_func, __equal_func)                                      \
+    __UHASH_DEF_TYPE(T, uhelem_t, char)                                                             \
+    __UHASH_IMPL(T, __uhash_static_inline, uhelem_t, char, 1, __hash_func, __equal_func)            \
+    __UHASH_SET_IMPL(T, __uhash_static_inline, uhelem_t, __hash_func)
 
 /// @name Hash and equality functions
 
@@ -424,7 +569,7 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
  * @param key [int64_t/uint64_t] The integer.
  * @return [uhash_hash_t] The hash value.
  */
-#define uhash_int64_hash(key) (uhash_hash_t)((key)>>33^(key)^(key)<<11)
+#define uhash_int64_hash(key) (uhash_hash_t)((key) >> 33u ^ (key) ^ (key) << 11u)
 
 /**
  * Hash function for strings.
@@ -433,6 +578,18 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
  * @return [uhash_hash_t] The hash value.
  */
 #define uhash_str_hash(key) __uhash_x31_str_hash(key)
+
+/**
+ * Hash function for pointers.
+ *
+ * @param key [pointer] The pointer.
+ * @return [uhash_hash_t] The hash value.
+ */
+#if UINTPTR_MAX <= 0xffffffff
+    #define uhash_ptr_hash(key) uhash_int32_hash((uint32_t)(key))
+#else
+    #define uhash_ptr_hash(key) uhash_int64_hash((uint64_t)(key))
+#endif
 
 /// @name Declaration
 
@@ -478,54 +635,64 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
  *
  * @param T [symbol] Hash table name.
  * @param h [UHash(T)*] Hash table instance.
- * @param k [T key type] Key to insert.
- * @param[out] r [uhash_ret_t] Return code.
- * @return [uhash_uint_t] Iterator to the inserted element.
+ * @param k [uhash_T_key] Key to insert.
+ * @param[out] r [uhash_ret_t*] Return code (see uhash_ret_t).
+ * @return [uhash_uint_t] Index of the inserted element.
  */
 #define uhash_put(T, h, k, r) uhash_put_##T(h, k, r)
 
 /**
- * Retrieves an iterator to the bucket associated with the specified key.
+ * Retrieves the index of the bucket associated with the specified key.
  *
  * @param T [symbol] Hash table name.
  * @param h [UHash(T)*] Hash table instance.
- * @param k [T key type] Key whose iterator should be retrieved.
- * @return [uhash_uint_t] Iterator to the key, or uhash_end(h) if it is absent.
+ * @param k [uhash_T_key] Key whose index should be retrieved.
+ * @return [uhash_uint_t] Index of the key, or UHASH_INDEX_MISSING if it is absent.
  */
 #define uhash_get(T, h, k) uhash_get_##T(h, k)
 
 /**
- * Deletes the bucket associated with the specified key.
+ * Deletes the bucket at the specified index.
  *
  * @param T [symbol] Hash table name.
  * @param h [UHash(T)*] Hash table instance.
- * @param k [uhash_uint_t] Iterator to the bucket to delete.
+ * @param k [uhash_uint_t] Index of the bucket to delete.
  */
 #define uhash_delete(T, h, k) uhash_delete_##T(h, k)
+
+/**
+ * Checks whether the hash table contains the specified key.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] Key to test.
+ * @return [bool] True if the hash table contains the specified key, false otherwise.
+ */
+#define uhash_contains(T, h, k) (uhash_get_##T(h, k) != UHASH_INDEX_MISSING)
 
 /**
  * Tests whether a bucket contains data.
  *
  * @param h [UHash(T)*] Hash table instance.
- * @param x [uhash_uint_t] Iterator to the bucket to test.
+ * @param x [uhash_uint_t] Index of the bucket to test.
  * @return [bool] True if the bucket contains data, false otherwise.
  */
-#define uhash_exists(h, x) (!__ac_iseither((h)->flags, (x)))
+#define uhash_exists(h, x) (!__uhf_iseither((h)->flags, (x)))
 
 /**
- * Retrieves a key given an iterator.
+ * Retrieves the key at the specified index.
  *
  * @param h [UHash(T)*] Hash table instance.
- * @param x [uhash_uint_t] Iterator to the bucket whose key should be retrieved.
- * @return [T key type] Key.
+ * @param x [uhash_uint_t] Index of the bucket whose key should be retrieved.
+ * @return [uhash_T_key] Key.
  */
 #define uhash_key(h, x) ((h)->keys[x])
 
 /**
- * Retrieves a value given an iterator.
+ * Retrieves the value at the specified index.
  *
  * @param h [UHash(T)*] Hash table instance.
- * @param x [uhash_uint_t] Iterator to the bucket whose value should be retrieved.
+ * @param x [uhash_uint_t] Index of the bucket whose value should be retrieved.
  * @return [T value type] Value.
  *
  * @note Results in a segfault for hash sets.
@@ -533,18 +700,18 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
 #define uhash_value(h, x) ((h)->vals[x])
 
 /**
- * Retrieves the start iterator.
+ * Retrieves the start index.
  *
  * @param h [UHash(T)*] Hash table instance.
- * @return [uhash_uint_t] Start iterator.
+ * @return [uhash_uint_t] Start index.
  */
 #define uhash_begin(h) (uhash_uint_t)(0)
 
 /**
- * Retrieves the 'end' iterator.
+ * Retrieves the end index.
  *
  * @param h [UHash(T)*] Hash table instance.
- * @return [uhash_uint_t] End iterator.
+ * @return [uhash_uint_t] End index.
  */
 #define uhash_end(h) ((h)->n_buckets)
 
@@ -566,6 +733,182 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
  */
 #define uhash_clear(T, h) uhash_clear_##T(h)
 
+/// @name Map-specific API
+
+/**
+ * Returns the value associated with the specified key.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] The key.
+ * @param m [uhash_T_val] Value to return if the key is missing.
+ * @return [uhash_T_val] Value associated with the specified key.
+ */
+#define uhmap_get(T, h, k, m) uhmap_get_##T(h, k, m)
+
+/**
+ * Adds a key:value pair to the map, returning the replaced value (if any).
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] The key.
+ * @param v [uhash_T_val] The value.
+ * @param[out] e [uhash_T_val*]Existing value, only set if key was already in the map.
+ * @return [uhash_ret_t] Return code (see uhash_ret_t).
+ */
+#define uhmap_set(T, h, k, v, e) uhmap_set_##T(h, k, v, e)
+
+/**
+ * Adds a key:value pair to the map, overwriting any existing value.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] The key.
+ * @param v [uhash_T_val] The value.
+ * @return [uhash_ret_t] Return code (see uhash_ret_t).
+ *
+ * @note This should only be used if values are not dynamically allocated, or if you're either
+ *       certain the map does not contain any value for the specified key, or you keep
+ *       references to values elsewhere. Otherwise, if this function returns UHASH_PRESENT,
+ *       the old value is leaked. uhmap_set/uhmap_add are safer alternatives, as they return
+ *       the existing value, if any.
+ */
+#define uhmap_overwrite(T, h, k, v) uhmap_set_##T(h, k, v, NULL)
+
+/**
+ * Adds a key:value pair to the map, only if the key is missing.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] The key.
+ * @param v [uhash_T_val] The value.
+ * @param[out] e [uhash_T_val*] Existing value, only set if key was already in the map.
+ * @return [uhash_ret_t] Return code (see uhash_ret_t).
+ */
+#define uhmap_add(T, h, k, v, e) uhmap_add_##T(h, k, v, e)
+
+/**
+ * Removes a key:value pair from the map.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] The key.
+ * @return [bool] True if the key was present (it was deleted), false otherwise.
+ */
+#define uhmap_remove(T, h, k) uhmap_remove_##T(h, k, NULL, NULL)
+
+/**
+ * Removes a key:value pair from the map, returning the deleted key and value.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] The key.
+ * @param[out] dk [uhash_T_key*] Deleted key, only set if key was present in the map.
+ * @param[out] dv [uhash_T_val*] Deleted value, only set if key was present in the map.
+ * @return [bool] True if the key was present (it was deleted), false otherwise.
+ */
+#define uhmap_pop(T, h, k, dk, dv) uhmap_remove_##T(h, k, dk, dv)
+
+/// @name Set-specific API
+
+/**
+ * Inserts an element in the set.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] Element to insert.
+ * @return [uhash_ret_t] Return code (see uhash_ret_t).
+ */
+#define uhset_insert(T, h, k) uhset_insert_##T(h, k, NULL)
+
+/**
+ * Inserts an element in the set, returning the existing element if it was already present.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] Element to insert.
+ * @param[out] e [uhash_T_key*] Existing element, only set if it was already in the set.
+ * @return [uhash_ret_t] Return code (see uhash_ret_t).
+ */
+#define uhset_insert_get_existing(T, h, k, e) uhset_insert_##T(h, k, e)
+
+/**
+ * Populates the set with elements from an array.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param a [uhash_T_key*] Array of elements.
+ * @param n [uhash_uint_t] Size of the array.
+ * @return [uhash_ret_t] Return code (see uhash_ret_t).
+ *
+ * @note This function returns UHASH_INSERTED if at least one element in the array
+ *       was missing from the set.
+ */
+#define uhset_insert_all(T, h, a, n) uhset_insert_all_##T(h, a, n)
+
+/**
+ * Removes an element from the set.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] Element to remove.
+ * @return [bool] True if the element was removed (it was present), false otherwise.
+ */
+#define uhset_remove(T, h, k) uhset_remove_##T(h, k, NULL)
+
+/**
+ * Removes an element from the set, returning the deleted element.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] Element to remove.
+ * @param[out] d [uhash_T_key*] Deleted element, only set if element was present in the set.
+ * @return [bool] True if the element was removed (it was present), false otherwise.
+ */
+#define uhset_pop(T, h, k, d) uhset_remove_##T(h, k, d)
+
+/**
+ * Checks whether the set is a superset of another set.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h1 [UHash(T)*] Superset.
+ * @param h2 [UHash(T)*] Subset.
+ * @return [bool] True if the superset relation holds, false otherwise.
+ */
+#define uhset_is_superset(T, h1, h2) uhset_is_superset_##T(h1, h2)
+
+/**
+ * Checks whether the set is equal to another set.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h1 [UHash(T)*] LHS of the equality relation.
+ * @param h2 [UHash(T)*] RHS of the equality relation.
+ * @return [bool] True if the equality relation holds, false otherwise.
+ */
+#define uhset_equals(T, h1, h2) ((h1)->count == (h2)->count && uhset_is_superset_##T(h1, h2))
+
+/**
+ * Computes the hash of the set.
+ * The computed hash does not depend on the order of the elements.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @return [uhash_hash_t] Hash of the set.
+ */
+#define uhset_hash(T, h) uhset_hash_##T(h)
+
+/**
+ * Returns one of the elements in the set.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param m [uhash_T_key] Value returned if the set is empty.
+ * @return [uhash_T_key] One of the elements in the set.
+ */
+#define uhset_get_any(T, h, m) uhset_get_any_##T(h, m)
+
+/// @name Iteration
+
 /**
  * Iterates over the entries in the hash table.
  *
@@ -577,11 +920,11 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
  */
 #define uhash_foreach(T, h, key_name, val_name, code) do {                                          \
     if (h) {                                                                                        \
-        uhash_uint_t __n_##key_name = uhash_end(h);                                                 \
+        uhash_uint_t __n_##key_name = (h)->n_buckets;                                               \
         for (uhash_uint_t __i_##key_name = 0; __i_##key_name != __n_##key_name; ++__i_##key_name) { \
             if (!uhash_exists(h, __i_##key_name)) continue;                                         \
-            uhash_##T##_key key_name = uhash_key(h, __i_##key_name);                                \
-            uhash_##T##_val val_name = uhash_val(h, __i_##key_name);                                \
+            uhash_##T##_key key_name = (h)->keys[__i_##key_name];                                   \
+            uhash_##T##_val val_name = (h)->vals[__i_##key_name];                                   \
             code;                                                                                   \
         }                                                                                           \
     }                                                                                               \
@@ -597,10 +940,10 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
  */
 #define uhash_foreach_key(T, h, key_name, code) do {                                                \
     if (h) {                                                                                        \
-        uhash_uint_t __n_##key_name = uhash_end(h);                                                 \
+        uhash_uint_t __n_##key_name = (h)->n_buckets;                                               \
         for (uhash_uint_t __i_##key_name = 0; __i_##key_name != __n_##key_name; ++__i_##key_name) { \
             if (!uhash_exists(h, __i_##key_name)) continue;                                         \
-            uhash_##T##_key key_name = uhash_key(h, __i_##key_name);                                \
+            uhash_##T##_key key_name = (h)->keys[__i_##key_name];                                   \
             code;                                                                                   \
         }                                                                                           \
     }                                                                                               \
@@ -616,10 +959,10 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
  */
 #define uhash_foreach_value(T, h, val_name, code) do {                                              \
     if (h) {                                                                                        \
-        uhash_uint_t __n_##val_name = uhash_end(h);                                                 \
+        uhash_uint_t __n_##val_name = (h)->n_buckets;                                               \
         for (uhash_uint_t __i_##val_name = 0; __i_##val_name != __n_##val_name; ++__i_##val_name) { \
             if (!uhash_exists(h, __i_##val_name)) continue;                                         \
-            uhash_##T##_val val_name = uhash_val(h, __i_##val_name);                                \
+            uhash_##T##_val val_name = (h)->vals[__i_##key_name];                                   \
             code;                                                                                   \
         }                                                                                           \
     }                                                                                               \
