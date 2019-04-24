@@ -219,7 +219,7 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
                                                                                                     \
     SCOPE uhash_uint_t uhash_get_##T(UHash_##T const *h, uhkey_t key) {                             \
         __uhash_analyzer_assert(h->vals);                                                           \
-        if (!h->n_buckets) return 0;                                                                \
+        if (!h->n_buckets) return UHASH_INDEX_MISSING;                                              \
                                                                                                     \
         uhash_uint_t const mask = h->n_buckets - 1;                                                 \
         uhash_uint_t i = (uhash_uint_t)(__hash_func(key)) & mask;                                   \
@@ -238,7 +238,7 @@ __uhash_static_inline uhash_hash_t __uhash_x31_str_hash(char const *key) {
     SCOPE bool uhash_resize_##T(UHash_##T *h, uhash_uint_t new_n_buckets) {                         \
         __uhash_analyzer_assert(h->vals);                                                           \
         /* Uses (0.25*n_buckets) bytes instead of [sizeof(key_t+val_t)+.25]*n_buckets. */           \
-        uint32_t *new_flags = 0;                                                                    \
+        uint32_t *new_flags = NULL;                                                                 \
         uhash_uint_t j = 1;                                                                         \
         {                                                                                           \
             __uhash_uint_next_power_2(new_n_buckets);                                               \

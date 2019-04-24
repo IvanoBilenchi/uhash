@@ -55,6 +55,9 @@ static bool test_base(void) {
     uint32_t const max = 100;
     UHash(IntSet) *set = uhash_alloc(IntSet);
 
+    uhash_assert(uhash_get(IntSet, set, 0) == UHASH_INDEX_MISSING);
+    uhash_assert(uhash_count(set) == 0);
+
     for (uint32_t i = 0; i < max; ++i) {
         uhash_ret_t ret;
         uhash_put(IntSet, set, i, &ret);
