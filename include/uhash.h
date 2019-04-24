@@ -20,11 +20,26 @@
 
 /// @name Types
 
-/// Unsigned integer type.
-#define uhash_uint_t uint32_t
+/**
+ * @def uhash_uint_t
+ * Unsigned integer type.
+ */
 
-/// Maximum value of a uhash_uint_t variable.
-#define UHASH_UINT_MAX UINT32_MAX
+/**
+ * @def UHASH_UINT_MAX
+ * Maximum value of a uhash_uint_t variable.
+ */
+
+#if defined UHASH_TINY
+    #define uhash_uint_t uint16_t
+    #define UHASH_UINT_MAX UINT16_MAX
+#elif defined UHASH_HUGE
+    #define uhash_uint_t uint64_t
+    #define UHASH_UINT_MAX UINT64_MAX
+#else
+    #define uhash_uint_t uint32_t
+    #define UHASH_UINT_MAX UINT32_MAX
+#endif
 
 /// Return codes for functions that add elements to the hash table.
 typedef enum uhash_ret_t {
@@ -111,18 +126,38 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
     return h;
 }
 
-/// Updates x so it matches the next power of two.
-#define __uhash_uint_next_power_2(x) (                                                              \
-    --(x),                                                                                          \
-    (x)|=(x)>>1u, (x)|=(x)>>2u, (x)|=(x)>>4u, (x)|=(x)>>8u, (x)|=(x)>>16u,                          \
-    ++(x)                                                                                           \
-)
-
 #define __uhash_cast_hash(key) (uhash_uint_t)(key)
 #define __uhash_int8_hash(key) __uhash_cast_hash(key)
 #define __uhash_int16_hash(key) __uhash_cast_hash(key)
-#define __uhash_int32_hash(key) __uhash_cast_hash(key)
-#define __uhash_int64_hash(key) (uhash_uint_t)((key) >> 33u ^ (key) ^ (key) << 11u)
+
+#if defined UHASH_TINY
+    #define __uhash_uint_next_power_2(x) (                                                          \
+        --(x),                                                                                      \
+        (x)|=(x)>>1u, (x)|=(x)>>2u, (x)|=(x)>>4u, (x)|=(x)>>8u,                                     \
+        ++(x)                                                                                       \
+    )
+    #define __uhash_int32_hash(key) (uhash_uint_t)((key) >> 17u ^ (key) ^ (key) << 6u)
+    #define __uhash_int64_hash(key) (uhash_uint_t)(                                                 \
+        (key) >> 49u ^ (key) >> 33u ^ (key) >> 17u ^ (key) ^                                        \
+        (key) << 6u ^ (key) << 23u ^ (key) << 39u                                                   \
+    )
+#elif defined UHASH_HUGE
+    #define __uhash_uint_next_power_2(x) (                                                          \
+        --(x),                                                                                      \
+        (x)|=(x)>>1u, (x)|=(x)>>2u, (x)|=(x)>>4u, (x)|=(x)>>8u, (x)|=(x)>>16u, (x)|=(x)>>32u,       \
+        ++(x)                                                                                       \
+    )
+    #define __uhash_int32_hash(key) __uhash_cast_hash(key)
+    #define __uhash_int64_hash(key) __uhash_cast_hash(key)
+#else
+    #define __uhash_uint_next_power_2(x) (                                                          \
+        --(x),                                                                                      \
+        (x)|=(x)>>1u, (x)|=(x)>>2u, (x)|=(x)>>4u, (x)|=(x)>>8u, (x)|=(x)>>16u,                      \
+        ++(x)                                                                                       \
+    )
+    #define __uhash_int32_hash(key) __uhash_cast_hash(key)
+    #define __uhash_int64_hash(key) (uhash_uint_t)((key) >> 33u ^ (key) ^ (key) << 11u)
+#endif
 
 /**
  * Defines a new hash table type.
