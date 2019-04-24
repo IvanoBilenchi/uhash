@@ -10,11 +10,7 @@
  */
 
 #include <stdio.h>
-#include <assert.h>
-#include <limits.h>
 #include <time.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "uhash.h"
 
@@ -22,12 +18,12 @@ UHASH_SET_INIT(str, char*, uhash_str_hash, uhash_str_equals)
 UHASH_MAP_INIT(int, uint32_t, unsigned char, uhash_int32_hash, uhash_identical)
 
 typedef struct {
-    unsigned key;
+    uint32_t key;
     unsigned char val;
 } int_unpack_t;
 
 typedef struct {
-    unsigned key;
+    uint32_t key;
     unsigned char val;
 } __attribute__ ((__packed__)) int_packed_t;
 
@@ -37,118 +33,107 @@ typedef struct {
 UHASH_SET_INIT(iun, int_unpack_t, hash_func, hash_eq)
 UHASH_SET_INIT(ipk, int_packed_t, hash_func, hash_eq)
 
-static int data_size = 5000000;
-static unsigned *int_data;
+static uint32_t data_size = 5000000;
+static uint32_t *int_data;
 static char **str_data;
 
-void ht_init_data()
-{
-    int i;
+void ht_init_data(void) {
     char buf[256];
     uint32_t x = 11;
-    int_data = (unsigned*)calloc(data_size, sizeof(unsigned));
-    str_data = (char**)calloc(data_size, sizeof(char*));
-    for (i = 0; i < data_size; ++i) {
-        int_data[i] = (unsigned)(data_size * ((double)x / UINT_MAX) / 4) * 271828183u;
+
+    int_data = calloc(data_size, sizeof(*int_data));
+    str_data = calloc(data_size, sizeof(*str_data));
+
+    for (uint32_t i = 0; i < data_size; ++i) {
+        int_data[i] = (uint32_t)(data_size * ((double)x / UINT32_MAX) / 4) * 271828183u;
         sprintf(buf, "%x", int_data[i]);
         str_data[i] = strdup(buf);
         x = 1664525L * x + 1013904223L;
     }
 }
 
-void ht_destroy_data()
-{
-    int i;
-    for (i = 0; i < data_size; ++i) free(str_data[i]);
-    free(str_data); free(int_data);
+void ht_destroy_data(void) {
+    for (uint32_t i = 0; i < data_size; ++i) free(str_data[i]);
+    free(str_data);
+    free(int_data);
 }
 
-void ht_uhash_int()
-{
-    int i, ret;
-    unsigned *data = int_data;
-    UHash(int) *h;
-    unsigned k;
+void ht_uhash_int(void) {
+    uint32_t *data = int_data;
+    UHash(int) *h = uhash_alloc(int);
 
-    h = uhash_alloc(int);
-    for (i = 0; i < data_size; ++i) {
-        k = uhash_put(int, h, data[i], &ret);
+    for (uint32_t i = 0; i < data_size; ++i) {
+        uhash_uint_t k = uhash_put(int, h, data[i], NULL);
         uhash_value(h, k) = i&0xff;
-        if (!ret) uhash_delete(int, h, k);
     }
-    printf("[ht_uhash_int] size: %u\n", uhash_count(h));
+
+    uint64_t count = uhash_count(h);
+    printf("[ht_uhash_int] size: %llu\n", count);
     uhash_free(int, h);
 }
 
-void ht_uhash_str()
-{
-    int i, ret;
+void ht_uhash_str(void) {
     char **data = str_data;
-    UHash(str) *h;
-    unsigned k;
+    UHash(str) *h = uhash_alloc(str);
 
-    h = uhash_alloc(str);
-    for (i = 0; i < data_size; ++i) {
-        k = uhash_put(str, h, data[i], &ret);
-        if (!ret) uhash_delete(str, h, k);
+    for (uint32_t i = 0; i < data_size; ++i) {
+        uhash_put(str, h, data[i], NULL);
     }
-    printf("[ht_uhash_int] size: %u\n", uhash_count(h));
+
+    uint64_t count = uhash_count(h);
+    printf("[ht_uhash_int] size: %llu\n", count);
     uhash_free(str, h);
 }
 
-void ht_uhash_unpack()
-{
-    int i, ret;
-    unsigned *data = int_data;
-    UHash(iun) *h;
-    unsigned k;
+void ht_uhash_unpack(void) {
+    uint32_t *data = int_data;
+    UHash(iun) *h = uhash_alloc(iun);
 
-    h = uhash_alloc(iun);
-    for (i = 0; i < data_size; ++i) {
+    for (uint32_t i = 0; i < data_size; ++i) {
         int_unpack_t x;
         x.key = data[i]; x.val = i&0xff;
-        k = uhash_put(iun, h, x, &ret);
-        if (!ret) uhash_delete(iun, h, k);
+        uhash_put(iun, h, x, NULL);
     }
-    printf("[ht_uhash_unpack] size: %u (sizeof=%ld)\n", uhash_count(h), sizeof(int_unpack_t));
+
+    uint64_t count = uhash_count(h);
+    printf("[ht_uhash_unpack] size: %llu (sizeof=%ld)\n", count, sizeof(int_unpack_t));
     uhash_free(iun, h);
 }
 
-void ht_uhash_packed()
-{
-    int i, ret;
-    unsigned *data = int_data;
-    UHash(ipk) *h;
-    unsigned k;
+void ht_uhash_packed(void) {
+    uint32_t *data = int_data;
+    UHash(ipk) *h = uhash_alloc(ipk);
 
-    h = uhash_alloc(ipk);
-    for (i = 0; i < data_size; ++i) {
+    for (uint32_t i = 0; i < data_size; ++i) {
         int_packed_t x;
         x.key = data[i]; x.val = i&0xff;
-        k = uhash_put(ipk, h, x, &ret);
-        if (!ret) uhash_delete(ipk, h, k);
+        uhash_put(ipk, h, x, NULL);
     }
-    printf("[ht_uhash_packed] size: %u (sizeof=%ld)\n", uhash_count(h), sizeof(int_packed_t));
+
+    uint64_t count = uhash_count(h);
+    printf("[ht_uhash_packed] size: %llu (sizeof=%ld)\n", count, sizeof(int_packed_t));
     uhash_free(ipk, h);
 }
 
-void ht_timing(void (*f)(void))
-{
+void ht_timing(void (*f)(void)) {
     clock_t t = clock();
     (*f)();
     printf("[ht_timing] %.3lf sec\n", (double)(clock() - t) / CLOCKS_PER_SEC);
 }
 
-int main(int argc, char *argv[])
-{
-    printf("Starting benchmark...\n");
+int main(int argc, char *argv[]) {
     if (argc > 1) data_size = atoi(argv[1]);
+
+    printf("Starting benchmark...\n");
+
     ht_init_data();
     ht_timing(ht_uhash_int);
     ht_timing(ht_uhash_str);
     ht_timing(ht_uhash_unpack);
     ht_timing(ht_uhash_packed);
     ht_destroy_data();
+
     printf("Benchmark finished.\n");
+
     return 0;
 }
