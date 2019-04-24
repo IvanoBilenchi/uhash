@@ -168,7 +168,7 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  */
 #define __UHASH_DEF_TYPE(T, uhkey_t, uhval_t)                                                       \
     typedef uhkey_t uhash_##T##_key;                                                                \
-    typedef uhkey_t uhash_##T##_val;                                                                \
+    typedef uhval_t uhash_##T##_val;                                                                \
     typedef struct UHash_##T {                                                                      \
         uhash_uint_t n_buckets;                                                                     \
         uhash_uint_t n_occupied;                                                                    \
@@ -1086,7 +1086,7 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
         uhash_uint_t __n_##val_name = (h)->n_buckets;                                               \
         for (uhash_uint_t __i_##val_name = 0; __i_##val_name != __n_##val_name; ++__i_##val_name) { \
             if (!uhash_exists(h, __i_##val_name)) continue;                                         \
-            uhash_##T##_val val_name = (h)->vals[__i_##key_name];                                   \
+            uhash_##T##_val val_name = (h)->vals[__i_##val_name];                                   \
             code;                                                                                   \
         }                                                                                           \
     }                                                                                               \
