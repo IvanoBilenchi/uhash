@@ -31,13 +31,13 @@
  */
 
 #if defined UHASH_TINY
-    #define uhash_uint_t uint16_t
+    typedef uint16_t uhash_uint_t;
     #define UHASH_UINT_MAX UINT16_MAX
 #elif defined UHASH_HUGE
-    #define uhash_uint_t uint64_t
+    typedef uint64_t uhash_uint_t;
     #define UHASH_UINT_MAX UINT64_MAX
 #else
-    #define uhash_uint_t uint32_t
+    typedef uint32_t uhash_uint_t;
     #define UHASH_UINT_MAX UINT32_MAX
 #endif
 
