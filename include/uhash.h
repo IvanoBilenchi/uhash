@@ -903,23 +903,6 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
 #define uhmap_set(T, h, k, v, e) uhmap_set_##T(h, k, v, e)
 
 /**
- * Adds a key:value pair to the map, overwriting any existing value.
- *
- * @param T [symbol] Hash table name.
- * @param h [UHash(T)*] Hash table instance.
- * @param k [uhash_T_key] The key.
- * @param v [uhash_T_val] The value.
- * @return [uhash_ret_t] Return code (see uhash_ret_t).
- *
- * @note This should only be used if values are not dynamically allocated, or if you're either
- *       certain the map does not contain any value for the specified key, or you keep
- *       references to values elsewhere. Otherwise, if this function returns UHASH_PRESENT,
- *       the old value is leaked. uhmap_set/uhmap_add are safer alternatives, as they return
- *       the existing value, if any.
- */
-#define uhmap_overwrite(T, h, k, v) uhmap_set_##T(h, k, v, NULL)
-
-/**
  * Adds a key:value pair to the map, only if the key is missing.
  *
  * @param T [symbol] Hash table name.
@@ -975,7 +958,7 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param k [uhash_T_key] Element to insert.
  * @return [uhash_ret_t] Return code (see uhash_ret_t).
  */
-#define uhset_insert(T, h, k, e) uhset_insert_##T(h, k, NULL)
+#define uhset_insert(T, h, k) uhset_insert_##T(h, k, NULL)
 
 /**
  * Inserts an element in the set, returning the existing element if it was already present.

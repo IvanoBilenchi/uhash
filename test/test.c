@@ -92,15 +92,19 @@ static bool test_map(void) {
     UHash(IntMap) *map = uhash_alloc(IntMap);
 
     for (uint32_t i = 0; i < max; ++i) {
-        uhash_assert(uhmap_overwrite(IntMap, map, i, i) == UHASH_INSERTED);
+        uhash_assert(uhmap_set(IntMap, map, i, i, NULL) == UHASH_INSERTED);
     }
 
     uint32_t existing_val;
-    uhash_assert(uhmap_set(IntMap, map, 0, 0, &existing_val) == UHASH_PRESENT);
+    uhash_assert(uhmap_set(IntMap, map, 0, 1, &existing_val) == UHASH_PRESENT);
     uhash_assert(existing_val == 0);
 
     uhash_assert(uhmap_add(IntMap, map, 0, 1, &existing_val) == UHASH_PRESENT);
-    uhash_assert(existing_val == 0);
+    uhash_assert(existing_val == 1);
+
+    uhash_assert(uhmap_replace(IntMap, map, 0, 0, &existing_val));
+    uhash_assert(uhmap_get(IntMap, map, 0, UINT32_MAX) == 0);
+    uhash_assert(existing_val == 1);
 
     uhash_assert(uhmap_add(IntMap, map, max, max, &existing_val) == UHASH_INSERTED);
     uhash_assert(uhmap_remove(IntMap, map, max));
@@ -119,11 +123,9 @@ static bool test_map(void) {
 static bool test_set(void) {
     uint32_t const max = 100;
     UHash(IntSet) *set = uhash_alloc(IntSet);
-    uhash_ret_t ret;
     
     for (uint32_t i = 0; i < max; ++i) {
-        ret = uhset_insert(IntSet, set, i);
-        uhash_assert(ret == UHASH_INSERTED);
+        uhash_assert(uhset_insert(IntSet, set, i) == UHASH_INSERTED);
     }
 
     uhash_assert(uhset_insert(IntSet, set, 0) == UHASH_PRESENT);
@@ -131,8 +133,7 @@ static bool test_set(void) {
 
     for (uint32_t i = 0; i < max; ++i) {
         uint32_t existing;
-        ret = uhset_insert_get_existing(IntSet, set, i, &existing);
-        uhash_assert(ret == UHASH_PRESENT);
+        uhash_assert(uhset_insert_get_existing(IntSet, set, i, &existing) == UHASH_PRESENT);
         uhash_assert(existing == i);
     }
 
@@ -141,11 +142,8 @@ static bool test_set(void) {
         elements[i] = i;
     }
 
-    ret = uhset_insert_all(IntSet, set, elements, max);
-    uhash_assert(ret == UHASH_PRESENT);
-
-    ret = uhset_insert_all(IntSet, set, elements, max + 1);
-    uhash_assert(ret == UHASH_INSERTED);
+    uhash_assert(uhset_insert_all(IntSet, set, elements, max) == UHASH_PRESENT);
+    uhash_assert(uhset_insert_all(IntSet, set, elements, max + 1) == UHASH_INSERTED);
 
     uhash_assert(uhash_contains(IntSet, set, max));
     uhash_assert(uhset_remove(IntSet, set, max));
@@ -170,6 +168,10 @@ static bool test_set(void) {
 
     uint32_t element = uhset_get_any(IntSet, set, max);
     uhash_assert(element != max);
+
+    uint32_t replaced;
+    uhash_assert(uhset_replace(IntSet, set, element, &replaced));
+    uhash_assert(replaced == element);
 
     uhash_clear(IntSet, set);
     element = uhset_get_any(IntSet, set, max);
