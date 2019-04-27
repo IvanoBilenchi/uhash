@@ -206,6 +206,7 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
     SCOPE uhval_t uhmap_get_##T(UHash_##T const *h, uhkey_t key, uhval_t if_missing);               \
     SCOPE uhash_ret_t uhmap_set_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *existing);   \
     SCOPE uhash_ret_t uhmap_add_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *existing);   \
+    SCOPE bool uhmap_replace_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *replaced);      \
     SCOPE bool uhmap_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *r_key, uhval_t *r_val);
 
 /**
@@ -218,6 +219,7 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
 #define __UHASH_SET_DECL(T, SCOPE, uhkey_t)                                                         \
     SCOPE uhash_ret_t uhset_insert_##T(UHash_##T *h, uhkey_t key, uhkey_t *existing);               \
     SCOPE uhash_ret_t uhset_insert_all_##T(UHash_##T *h, uhkey_t const *items, uhash_uint_t n);     \
+    SCOPE bool uhset_replace_##T(UHash_##T *h, uhkey_t key, uhkey_t *replaced);                     \
     SCOPE bool uhset_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *removed);                       \
     SCOPE bool uhset_is_superset_##T(UHash_##T const *h1, UHash_##T const *h2);                     \
     SCOPE uhash_uint_t uhset_hash_##T(UHash_##T const *h);                                          \
@@ -487,6 +489,15 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
         return ret;                                                                                 \
     }                                                                                               \
                                                                                                     \
+    SCOPE bool uhmap_replace_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *replaced) {     \
+        __uhash_analyzer_assert(h->vals);                                                           \
+        uhash_uint_t k = uhash_get_##T(h, key);                                                     \
+        if (k == UHASH_INDEX_MISSING) return false;                                                 \
+        if (replaced) *replaced = h->vals[k];                                                       \
+        h->vals[k] = value;                                                                         \
+        return true;                                                                                \
+    }                                                                                               \
+                                                                                                    \
     SCOPE bool uhmap_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *r_key, uhval_t *r_val) {        \
         __uhash_analyzer_assert(h->vals);                                                           \
         uhash_uint_t k = uhash_get_##T(h, key);                                                     \
@@ -527,6 +538,15 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
         }                                                                                           \
                                                                                                     \
         return ret;                                                                                 \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE bool uhset_replace_##T(UHash_##T *h, uhkey_t key, uhkey_t *replaced) {                    \
+        __uhash_analyzer_assert(h->vals);                                                           \
+        uhash_uint_t k = uhash_get_##T(h, key);                                                     \
+        if (k == UHASH_INDEX_MISSING) return false;                                                 \
+        if (replaced) *replaced = h->keys[k];                                                       \
+        h->keys[k] = key;                                                                           \
+        return true;                                                                                \
     }                                                                                               \
                                                                                                     \
     SCOPE bool uhset_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *removed) {                      \
@@ -877,7 +897,7 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table instance.
  * @param k [uhash_T_key] The key.
  * @param v [uhash_T_val] The value.
- * @param[out] e [uhash_T_val*]Existing value, only set if key was already in the map.
+ * @param[out] e [uhash_T_val*] Existing value, only set if key was already in the map.
  * @return [uhash_ret_t] Return code (see uhash_ret_t).
  */
 #define uhmap_set(T, h, k, v, e) uhmap_set_##T(h, k, v, e)
@@ -912,6 +932,18 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
 #define uhmap_add(T, h, k, v, e) uhmap_add_##T(h, k, v, e)
 
 /**
+ * Replaces a value in the map, only if its associated key exists.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] The key.
+ * @param v [uhash_T_val] The value.
+ * @param[out] r [uhash_T_val*] Replaced value, only set if the return value is true.
+ * @return [bool] True if the value was replaced (its key was present), false otherwise.
+ */
+#define uhmap_replace(T, h, k, v, r) uhmap_replace_##T(h, k, v, r)
+
+/**
  * Removes a key:value pair from the map.
  *
  * @param T [symbol] Hash table name.
@@ -943,7 +975,7 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param k [uhash_T_key] Element to insert.
  * @return [uhash_ret_t] Return code (see uhash_ret_t).
  */
-#define uhset_insert(T, h, k) uhset_insert_##T(h, k, NULL)
+#define uhset_insert(T, h, k, e) uhset_insert_##T(h, k, NULL)
 
 /**
  * Inserts an element in the set, returning the existing element if it was already present.
@@ -969,6 +1001,17 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *       was missing from the set.
  */
 #define uhset_insert_all(T, h, a, n) uhset_insert_all_##T(h, a, n)
+
+/**
+ * Replaces an element in the set, only if it exists.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h [UHash(T)*] Hash table instance.
+ * @param k [uhash_T_key] Element to replace.
+ * @param[out] r [uhash_T_key*] Replaced element, only set if the return value is true.
+ * @return [bool] True if the element was replaced (it was present), false otherwise.
+ */
+#define uhset_replace(T, h, k, r) uhset_replace_##T(h, k, r)
 
 /**
  * Removes an element from the set.
