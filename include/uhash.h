@@ -601,6 +601,19 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
     __UHASH_MAP_DECL(T, __uhash_unused, uhkey_t, uhval_t)
 
 /**
+ * Declares a new hash map type, prepending a specifier to the generated declarations.
+ *
+ * @param T [symbol] Hash table name.
+ * @param uhkey_t [symbol] Type of the keys.
+ * @param uhval_t [symbol] Type of the values.
+ * @param SPEC [specifier] Specifier.
+ */
+#define UHASH_MAP_DECL_SPEC(T, uhkey_t, uhval_t, SPEC)                                              \
+    __UHASH_DEF_TYPE(T, uhkey_t, uhval_t)                                                           \
+    __UHASH_DECL(T, SPEC __uhash_unused, uhkey_t)                                                   \
+    __UHASH_MAP_DECL(T, SPEC __uhash_unused, uhkey_t, uhval_t)
+
+/**
  * Declares a new hash set type.
  *
  * @param T [symbol] Hash table name.
@@ -610,6 +623,18 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
     __UHASH_DEF_TYPE(T, uhelem_t, char)                                                             \
     __UHASH_DECL(T, __uhash_unused, uhelem_t)                                                       \
     __UHASH_SET_DECL(T, __uhash_unused, uhelem_t)
+
+/**
+ * Declares a new hash set type, prepending a specifier to the generated declarations.
+ *
+ * @param T [symbol] Hash table name.
+ * @param uhelem_t [symbol] Type of the elements.
+ * @param SPEC [specifier] Specifier.
+ */
+#define UHASH_SET_DECL_SPEC(T, uhelem_t, SPEC)                                                      \
+    __UHASH_DEF_TYPE(T, uhelem_t, char)                                                             \
+    __UHASH_DECL(T, SPEC __uhash_unused, uhelem_t)                                                  \
+    __UHASH_SET_DECL(T, SPEC __uhash_unused, uhelem_t)
 
 /**
  * Implements a previously declared hash map type.
