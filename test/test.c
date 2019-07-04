@@ -1,10 +1,12 @@
-/** @file
+/**
  * Tests for the uHash library.
  *
  * @author Ivano Bilenchi
  *
  * @copyright Copyright (c) 2019 Ivano Bilenchi <https://ivanobilenchi.com>
  * @copyright SPDX-License-Identifier: MIT
+ *
+ * @file
  */
 
 #include <stdio.h>

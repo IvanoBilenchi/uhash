@@ -1,4 +1,4 @@
-/** @file
+/**
  * uHash - a type-safe, generic C hash table.
  *
  * @see test.c for usage examples.
@@ -8,6 +8,8 @@
  * @copyright Copyright (c) 2008, 2009, 2011 Attractive Chaos <attractor@live.co.uk>
  * @copyright Copyright (c) 2019 Ivano Bilenchi <https://ivanobilenchi.com>
  * @copyright SPDX-License-Identifier: MIT
+ *
+ * @file
  */
 
 #ifndef UHASH_H
@@ -18,30 +20,33 @@
 #include <stdlib.h>
 #include <string.h>
 
-/// @name Types
+// #########
+// # Types #
+// #########
 
 /**
- * @def uhash_uint_t
+ * A type safe, generic hash table.
+ * @struct UHash
+ */
+
+/**
  * Unsigned integer type.
+ *
+ * @public @memberof UHash
  */
-
-/**
- * @def UHASH_UINT_MAX
- * Maximum value of a uhash_uint_t variable.
- */
-
 #if defined UHASH_TINY
     typedef uint16_t uhash_uint_t;
-    #define UHASH_UINT_MAX UINT16_MAX
 #elif defined UHASH_HUGE
     typedef uint64_t uhash_uint_t;
-    #define UHASH_UINT_MAX UINT64_MAX
 #else
     typedef uint32_t uhash_uint_t;
-    #define UHASH_UINT_MAX UINT32_MAX
 #endif
 
-/// Return codes for functions that add elements to the hash table.
+/**
+ * Return codes for functions that add elements to the hash table.
+ *
+ * @public @memberof UHash
+ */
 typedef enum uhash_ret_t {
 
     /// The operation failed (as of right now it can only happen if *alloc returns NULL).
@@ -55,7 +60,18 @@ typedef enum uhash_ret_t {
 
 } uhash_ret_t;
 
-/// @name Constants
+// #############
+// # Constants #
+// #############
+
+/// Maximum value of a uhash_uint_t variable.
+#if defined UHASH_TINY
+    #define UHASH_UINT_MAX UINT16_MAX
+#elif defined UHASH_HUGE
+    #define UHASH_UINT_MAX UINT64_MAX
+#else
+    #define UHASH_UINT_MAX UINT32_MAX
+#endif
 
 /// Index returned when a key is not present in the hash table.
 #define UHASH_INDEX_MISSING UHASH_UINT_MAX
@@ -65,7 +81,9 @@ typedef enum uhash_ret_t {
     #define UHASH_MAX_LOAD 0.77
 #endif
 
-/// @name Private API and Implementation
+// ###############
+// # Private API #
+// ###############
 
 /// Cross-platform 'inline' specifier.
 #ifndef __uhash_inline
@@ -167,16 +185,21 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param uhval_t [type] Hash table value type.
  */
 #define __UHASH_DEF_TYPE(T, uhkey_t, uhval_t)                                                       \
-    typedef uhkey_t uhash_##T##_key;                                                                \
-    typedef uhval_t uhash_##T##_val;                                                                \
     typedef struct UHash_##T {                                                                      \
+        /** @cond */                                                                                \
         uhash_uint_t n_buckets;                                                                     \
         uhash_uint_t n_occupied;                                                                    \
         uhash_uint_t count;                                                                         \
         uint32_t *flags;                                                                            \
         uhkey_t *keys;                                                                              \
         uhval_t *vals;                                                                              \
-    } UHash_##T;
+        /** @endcond */                                                                             \
+    } UHash_##T;                                                                                    \
+                                                                                                    \
+    /** @cond */                                                                                    \
+    typedef uhkey_t uhash_##T##_key;                                                                \
+    typedef uhval_t uhash_##T##_val;                                                                \
+    /** @endcond */
 
 /**
  * Generates function declarations for the specified hash table type.
@@ -186,13 +209,15 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param uhkey_t [type] Hash table key type.
  */
 #define __UHASH_DECL(T, SCOPE, uhkey_t)                                                             \
+    /** @cond */                                                                                    \
     SCOPE UHash_##T *uhash_alloc_##T(void);                                                         \
     SCOPE void uhash_free_##T(UHash_##T *h);                                                        \
     SCOPE void uhash_clear_##T(UHash_##T *h);                                                       \
     SCOPE uhash_uint_t uhash_get_##T(UHash_##T const *h, uhkey_t key);                              \
     SCOPE bool uhash_resize_##T(UHash_##T *h, uhash_uint_t new_n_buckets);                          \
     SCOPE uhash_uint_t uhash_put_##T(UHash_##T *h, uhkey_t key, uhash_ret_t *ret);                  \
-    SCOPE void uhash_delete_##T(UHash_##T *h, uhash_uint_t x);
+    SCOPE void uhash_delete_##T(UHash_##T *h, uhash_uint_t x);                                      \
+    /** @endcond */
 
 /**
  * Generates function declarations for the specified hash map type.
@@ -203,11 +228,13 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param uhval_t [type] Hash table value type.
  */
 #define __UHASH_MAP_DECL(T, SCOPE, uhkey_t, uhval_t)                                                \
+    /** @cond */                                                                                    \
     SCOPE uhval_t uhmap_get_##T(UHash_##T const *h, uhkey_t key, uhval_t if_missing);               \
     SCOPE uhash_ret_t uhmap_set_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *existing);   \
     SCOPE uhash_ret_t uhmap_add_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *existing);   \
     SCOPE bool uhmap_replace_##T(UHash_##T *h, uhkey_t key, uhval_t value, uhval_t *replaced);      \
-    SCOPE bool uhmap_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *r_key, uhval_t *r_val);
+    SCOPE bool uhmap_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *r_key, uhval_t *r_val);         \
+    /** @endcond */
 
 /**
  * Generates function declarations for the specified hash set type.
@@ -217,13 +244,15 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param uhkey_t [type] Hash table key type.
  */
 #define __UHASH_SET_DECL(T, SCOPE, uhkey_t)                                                         \
+    /** @cond */                                                                                    \
     SCOPE uhash_ret_t uhset_insert_##T(UHash_##T *h, uhkey_t key, uhkey_t *existing);               \
     SCOPE uhash_ret_t uhset_insert_all_##T(UHash_##T *h, uhkey_t const *items, uhash_uint_t n);     \
     SCOPE bool uhset_replace_##T(UHash_##T *h, uhkey_t key, uhkey_t *replaced);                     \
     SCOPE bool uhset_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *removed);                       \
     SCOPE bool uhset_is_superset_##T(UHash_##T const *h1, UHash_##T const *h2);                     \
     SCOPE uhash_uint_t uhset_hash_##T(UHash_##T const *h);                                          \
-    SCOPE uhkey_t uhset_get_any_##T(UHash_##T const *h, uhkey_t if_empty);
+    SCOPE uhkey_t uhset_get_any_##T(UHash_##T const *h, uhkey_t if_empty);                          \
+    /** @endcond */
 
 /**
  * Generates function definitions for the specified hash table type.
@@ -584,7 +613,9 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
         return i == h->n_buckets ? if_empty : h->keys[i];                                           \
     }
 
-/// @name Public API
+// ##############
+// # Public API #
+// ##############
 
 /// @name Type definitions
 
@@ -594,6 +625,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param T [symbol] Hash table name.
  * @param uhkey_t [symbol] Type of the keys.
  * @param uhval_t [symbol] Type of the values.
+ *
+ * @public @related UHash
  */
 #define UHASH_MAP_DECL(T, uhkey_t, uhval_t)                                                         \
     __UHASH_DEF_TYPE(T, uhkey_t, uhval_t)                                                           \
@@ -607,6 +640,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param uhkey_t [symbol] Type of the keys.
  * @param uhval_t [symbol] Type of the values.
  * @param SPEC [specifier] Specifier.
+ *
+ * @public @related UHash
  */
 #define UHASH_MAP_DECL_SPEC(T, uhkey_t, uhval_t, SPEC)                                              \
     __UHASH_DEF_TYPE(T, uhkey_t, uhval_t)                                                           \
@@ -618,6 +653,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param T [symbol] Hash table name.
  * @param uhelem_t [symbol] Type of the elements.
+ *
+ * @public @related UHash
  */
 #define UHASH_SET_DECL(T, uhelem_t)                                                                 \
     __UHASH_DEF_TYPE(T, uhelem_t, char)                                                             \
@@ -630,6 +667,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param T [symbol] Hash table name.
  * @param uhelem_t [symbol] Type of the elements.
  * @param SPEC [specifier] Specifier.
+ *
+ * @public @related UHash
  */
 #define UHASH_SET_DECL_SPEC(T, uhelem_t, SPEC)                                                      \
     __UHASH_DEF_TYPE(T, uhelem_t, char)                                                             \
@@ -644,6 +683,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param uhval_t [symbol] Type of the values.
  * @param __hash_func [(uhkey_t) -> uhash_uint_t] Hash function.
  * @param __equal_func [(uhkey_t, uhkey_t) -> bool] Equality function.
+ *
+ * @public @related UHash
  */
 #define UHASH_MAP_IMPL(T, uhkey_t, uhval_t, __hash_func, __equal_func)                              \
     __UHASH_IMPL(T, __uhash_unused, uhkey_t, uhval_t, 1, __hash_func, __equal_func)                 \
@@ -656,6 +697,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param uhelem_t [symbol] Type of the elements.
  * @param __hash_func [(uhelem_t) -> uhash_uint_t] Hash function.
  * @param __equal_func [(uhelem_t, uhelem_t) -> bool] Equality function.
+ *
+ * @public @related UHash
  */
 #define UHASH_SET_IMPL(T, uhelem_t, __hash_func, __equal_func)                                      \
     __UHASH_IMPL(T, __uhash_unused, uhelem_t, char, 0, __hash_func, __equal_func)                   \
@@ -669,6 +712,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param uhval_t [symbol] Type of the values.
  * @param __hash_func [(uhkey_t) -> uhash_uint_t] Hash function.
  * @param __equal_func [(uhkey_t, uhkey_t) -> bool] Equality function.
+ *
+ * @public @related UHash
  */
 #define UHASH_MAP_INIT(T, uhkey_t, uhval_t, __hash_func, __equal_func)                              \
     __UHASH_DEF_TYPE(T, uhkey_t, uhval_t)                                                           \
@@ -682,6 +727,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param uhelem_t [symbol] Type of the elements.
  * @param __hash_func [(uhkey_t) -> uhash_uint_t] Hash function.
  * @param __equal_func [(uhkey_t, uhkey_t) -> bool] Equality function.
+ *
+ * @public @related UHash
  */
 #define UHASH_SET_INIT(T, uhelem_t, __hash_func, __equal_func)                                      \
     __UHASH_DEF_TYPE(T, uhelem_t, char)                                                             \
@@ -696,6 +743,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param a LHS of the identity.
  * @param b RHS of the identity.
  * @return a == b
+ *
+ * @public @related UHash
  */
 #define uhash_identical(a, b) ((a) == (b))
 
@@ -705,6 +754,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param a [char const *] LHS of the equality relation (NULL terminated string).
  * @param b [char const *] RHS of the equality relation (NULL terminated string).
  * @return [bool] True if a is equal to b, false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhash_str_equals(a, b) (strcmp(a, b) == 0)
 
@@ -713,6 +764,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param key [int8_t/uint8_t] The integer.
  * @return [uhash_uint_t] The hash value.
+ *
+ * @public @related UHash
  */
 #define uhash_int8_hash(key) __uhash_int8_hash(key)
 
@@ -721,6 +774,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param key [int16_t/uint16_t] The integer.
  * @return [uhash_uint_t] The hash value.
+ *
+ * @public @related UHash
  */
 #define uhash_int16_hash(key) __uhash_int16_hash(key)
 
@@ -729,6 +784,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param key [int32_t/uint32_t] The integer.
  * @return [uhash_uint_t] The hash value.
+ *
+ * @public @related UHash
  */
 #define uhash_int32_hash(key) __uhash_int32_hash(key)
 
@@ -737,6 +794,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param key [int64_t/uint64_t] The integer.
  * @return [uhash_uint_t] The hash value.
+ *
+ * @public @related UHash
  */
 #define uhash_int64_hash(key) __uhash_int64_hash(key)
 
@@ -745,6 +804,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param key [char const *] Pointer to a NULL-terminated string.
  * @return [uhash_uint_t] The hash value.
+ *
+ * @public @related UHash
  */
 #define uhash_str_hash(key) __uhash_x31_str_hash(key)
 
@@ -753,6 +814,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param key [pointer] The pointer.
  * @return [uhash_uint_t] The hash value.
+ *
+ * @public @related UHash
  */
 #if UINTPTR_MAX <= 0xffffffff
     #define uhash_ptr_hash(key) __uhash_int32_hash((uint32_t)(key))
@@ -766,6 +829,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * Declares a new hash table variable.
  *
  * @param T [symbol] Hash table name.
+ *
+ * @public @related UHash
  */
 #define UHash(T) UHash_##T
 
@@ -776,6 +841,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param T [symbol] Hash table name.
  * @return [UHash(T)*] Hash table instance.
+ *
+ * @public @related UHash
  */
 #define uhash_alloc(T) uhash_alloc_##T()
 
@@ -784,6 +851,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param T [symbol] Hash table name.
  * @param h [UHash(T)*] Hash table to deallocate.
+ *
+ * @public @related UHash
  */
 #define uhash_free(T, h) uhash_free_##T(h)
 
@@ -794,6 +863,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table to resize.
  * @param s [uhash_uint_t] Hash table size.
  * @return [bool] True if the operation succeeded, false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhash_resize(T, h, s) uhash_resize_##T(h, s)
 
@@ -807,6 +878,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param k [uhash_T_key] Key to insert.
  * @param[out] r [uhash_ret_t*] Return code (see uhash_ret_t).
  * @return [uhash_uint_t] Index of the inserted element.
+ *
+ * @public @related UHash
  */
 #define uhash_put(T, h, k, r) uhash_put_##T(h, k, r)
 
@@ -817,6 +890,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table instance.
  * @param k [uhash_T_key] Key whose index should be retrieved.
  * @return [uhash_uint_t] Index of the key, or UHASH_INDEX_MISSING if it is absent.
+ *
+ * @public @related UHash
  */
 #define uhash_get(T, h, k) uhash_get_##T(h, k)
 
@@ -826,6 +901,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param T [symbol] Hash table name.
  * @param h [UHash(T)*] Hash table instance.
  * @param k [uhash_uint_t] Index of the bucket to delete.
+ *
+ * @public @related UHash
  */
 #define uhash_delete(T, h, k) uhash_delete_##T(h, k)
 
@@ -836,6 +913,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table instance.
  * @param k [uhash_T_key] Key to test.
  * @return [bool] True if the hash table contains the specified key, false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhash_contains(T, h, k) (uhash_get_##T(h, k) != UHASH_INDEX_MISSING)
 
@@ -845,6 +924,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table instance.
  * @param x [uhash_uint_t] Index of the bucket to test.
  * @return [bool] True if the bucket contains data, false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhash_exists(h, x) (!__uhf_iseither((h)->flags, (x)))
 
@@ -854,6 +935,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table instance.
  * @param x [uhash_uint_t] Index of the bucket whose key should be retrieved.
  * @return [uhash_T_key] Key.
+ *
+ * @public @related UHash
  */
 #define uhash_key(h, x) ((h)->keys[x])
 
@@ -865,6 +948,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @return [T value type] Value.
  *
  * @note Results in a segfault for hash sets.
+ *
+ * @public @related UHash
  */
 #define uhash_value(h, x) ((h)->vals[x])
 
@@ -873,6 +958,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param h [UHash(T)*] Hash table instance.
  * @return [uhash_uint_t] Start index.
+ *
+ * @public @related UHash
  */
 #define uhash_begin(h) (uhash_uint_t)(0)
 
@@ -881,6 +968,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param h [UHash(T)*] Hash table instance.
  * @return [uhash_uint_t] End index.
+ *
+ * @public @related UHash
  */
 #define uhash_end(h) ((h)->n_buckets)
 
@@ -891,6 +980,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @return [uhash_uint_t] Number of elements.
  *
  * @note For convenience, this macro returns '0' for NULL hash tables.
+ *
+ * @public @related UHash
  */
 #define uhash_count(h) ((h) ? (h)->count : 0)
 
@@ -899,6 +990,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @param T [symbol] Hash table name.
  * @param h [UHash(T)*] Hash table instance.
+ *
+ * @public @related UHash
  */
 #define uhash_clear(T, h) uhash_clear_##T(h)
 
@@ -912,6 +1005,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param k [uhash_T_key] The key.
  * @param m [uhash_T_val] Value to return if the key is missing.
  * @return [uhash_T_val] Value associated with the specified key.
+ *
+ * @public @related UHash
  */
 #define uhmap_get(T, h, k, m) uhmap_get_##T(h, k, m)
 
@@ -924,6 +1019,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param v [uhash_T_val] The value.
  * @param[out] e [uhash_T_val*] Existing value, only set if key was already in the map.
  * @return [uhash_ret_t] Return code (see uhash_ret_t).
+ *
+ * @public @related UHash
  */
 #define uhmap_set(T, h, k, v, e) uhmap_set_##T(h, k, v, e)
 
@@ -936,6 +1033,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param v [uhash_T_val] The value.
  * @param[out] e [uhash_T_val*] Existing value, only set if key was already in the map.
  * @return [uhash_ret_t] Return code (see uhash_ret_t).
+ *
+ * @public @related UHash
  */
 #define uhmap_add(T, h, k, v, e) uhmap_add_##T(h, k, v, e)
 
@@ -948,6 +1047,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param v [uhash_T_val] The value.
  * @param[out] r [uhash_T_val*] Replaced value, only set if the return value is true.
  * @return [bool] True if the value was replaced (its key was present), false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhmap_replace(T, h, k, v, r) uhmap_replace_##T(h, k, v, r)
 
@@ -958,6 +1059,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table instance.
  * @param k [uhash_T_key] The key.
  * @return [bool] True if the key was present (it was deleted), false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhmap_remove(T, h, k) uhmap_remove_##T(h, k, NULL, NULL)
 
@@ -970,6 +1073,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param[out] dk [uhash_T_key*] Deleted key, only set if key was present in the map.
  * @param[out] dv [uhash_T_val*] Deleted value, only set if key was present in the map.
  * @return [bool] True if the key was present (it was deleted), false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhmap_pop(T, h, k, dk, dv) uhmap_remove_##T(h, k, dk, dv)
 
@@ -982,6 +1087,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table instance.
  * @param k [uhash_T_key] Element to insert.
  * @return [uhash_ret_t] Return code (see uhash_ret_t).
+ *
+ * @public @related UHash
  */
 #define uhset_insert(T, h, k) uhset_insert_##T(h, k, NULL)
 
@@ -993,6 +1100,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param k [uhash_T_key] Element to insert.
  * @param[out] e [uhash_T_key*] Existing element, only set if it was already in the set.
  * @return [uhash_ret_t] Return code (see uhash_ret_t).
+ *
+ * @public @related UHash
  */
 #define uhset_insert_get_existing(T, h, k, e) uhset_insert_##T(h, k, e)
 
@@ -1007,6 +1116,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  *
  * @note This function returns UHASH_INSERTED if at least one element in the array
  *       was missing from the set.
+ *
+ * @public @related UHash
  */
 #define uhset_insert_all(T, h, a, n) uhset_insert_all_##T(h, a, n)
 
@@ -1018,6 +1129,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param k [uhash_T_key] Element to replace.
  * @param[out] r [uhash_T_key*] Replaced element, only set if the return value is true.
  * @return [bool] True if the element was replaced (it was present), false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhset_replace(T, h, k, r) uhset_replace_##T(h, k, r)
 
@@ -1028,6 +1141,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table instance.
  * @param k [uhash_T_key] Element to remove.
  * @return [bool] True if the element was removed (it was present), false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhset_remove(T, h, k) uhset_remove_##T(h, k, NULL)
 
@@ -1039,6 +1154,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param k [uhash_T_key] Element to remove.
  * @param[out] d [uhash_T_key*] Deleted element, only set if element was present in the set.
  * @return [bool] True if the element was removed (it was present), false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhset_pop(T, h, k, d) uhset_remove_##T(h, k, d)
 
@@ -1049,6 +1166,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h1 [UHash(T)*] Superset.
  * @param h2 [UHash(T)*] Subset.
  * @return [bool] True if the superset relation holds, false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhset_is_superset(T, h1, h2) uhset_is_superset_##T(h1, h2)
 
@@ -1059,6 +1178,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h1 [UHash(T)*] LHS of the equality relation.
  * @param h2 [UHash(T)*] RHS of the equality relation.
  * @return [bool] True if the equality relation holds, false otherwise.
+ *
+ * @public @related UHash
  */
 #define uhset_equals(T, h1, h2) ((h1)->count == (h2)->count && uhset_is_superset_##T(h1, h2))
 
@@ -1069,6 +1190,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param T [symbol] Hash table name.
  * @param h [UHash(T)*] Hash table instance.
  * @return [uhash_uint_t] Hash of the set.
+ *
+ * @public @related UHash
  */
 #define uhset_hash(T, h) uhset_hash_##T(h)
 
@@ -1079,6 +1202,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table instance.
  * @param m [uhash_T_key] Value returned if the set is empty.
  * @return [uhash_T_key] One of the elements in the set.
+ *
+ * @public @related UHash
  */
 #define uhset_get_any(T, h, m) uhset_get_any_##T(h, m)
 
@@ -1092,6 +1217,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param key_name [symbol] Name of the variable to which the key will be assigned.
  * @param val_name [symbol] Name of the variable to which the value will be assigned.
  * @param code [code] Code block to execute.
+ *
+ * @public @related UHash
  */
 #define uhash_foreach(T, h, key_name, val_name, code) do {                                          \
     if (h) {                                                                                        \
@@ -1112,6 +1239,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table instance.
  * @param key_name [symbol] Name of the variable to which the key will be assigned.
  * @param code [code] Code block to execute.
+ *
+ * @public @related UHash
  */
 #define uhash_foreach_key(T, h, key_name, code) do {                                                \
     if (h) {                                                                                        \
@@ -1131,6 +1260,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @param h [UHash(T)*] Hash table instance.
  * @param val_name [symbol] Name of the variable to which the value will be assigned.
  * @param code [code] Code block to execute.
+ *
+ * @public @related UHash
  */
 #define uhash_foreach_value(T, h, val_name, code) do {                                              \
     if (h) {                                                                                        \

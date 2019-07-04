@@ -1,4 +1,4 @@
-/** @file
+/**
  * Benchmarks for the uHash library.
  *
  * @author Attractive Chaos (khash)
@@ -7,6 +7,8 @@
  * @copyright Copyright (c) 2008, 2009, 2011 Attractive Chaos <attractor@live.co.uk>
  * @copyright Copyright (c) 2019 Ivano Bilenchi <https://ivanobilenchi.com>
  * @copyright SPDX-License-Identifier: MIT
+ *
+ * @file
  */
 
 #include <stdio.h>
