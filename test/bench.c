@@ -16,8 +16,8 @@
 
 #include "uhash.h"
 
-UHASH_SET_INIT(str, char*, uhash_str_hash, uhash_str_equals)
-UHASH_MAP_INIT(int, uint32_t, unsigned char, uhash_int32_hash, uhash_identical)
+UHASH_INIT(str, char*, UHASH_VAL_IGNORE, uhash_str_hash, uhash_str_equals)
+UHASH_INIT(int, uint32_t, unsigned char, uhash_int32_hash, uhash_identical)
 
 typedef struct {
     uint32_t key;
@@ -32,8 +32,8 @@ typedef struct {
 #define hash_eq(a, b) ((a).key == (b).key)
 #define hash_func(a) ((a).key)
 
-UHASH_SET_INIT(iun, int_unpack_t, hash_func, hash_eq)
-UHASH_SET_INIT(ipk, int_packed_t, hash_func, hash_eq)
+UHASH_INIT(iun, int_unpack_t, UHASH_VAL_IGNORE, hash_func, hash_eq)
+UHASH_INIT(ipk, int_packed_t, UHASH_VAL_IGNORE, hash_func, hash_eq)
 
 static uint32_t data_size = 5000000;
 static uint32_t *int_data;
@@ -62,7 +62,7 @@ void ht_destroy_data(void) {
 
 void ht_uhash_int(void) {
     uint32_t *data = int_data;
-    UHash(int) *h = uhash_alloc(int);
+    UHash(int) *h = uhmap_alloc(int);
 
     for (uint32_t i = 0; i < data_size; ++i) {
         uhash_uint_t k = uhash_put(int, h, data[i], NULL);
@@ -76,7 +76,7 @@ void ht_uhash_int(void) {
 
 void ht_uhash_str(void) {
     char **data = str_data;
-    UHash(str) *h = uhash_alloc(str);
+    UHash(str) *h = uhset_alloc(str);
 
     for (uint32_t i = 0; i < data_size; ++i) {
         uhash_put(str, h, data[i], NULL);
@@ -89,7 +89,7 @@ void ht_uhash_str(void) {
 
 void ht_uhash_unpack(void) {
     uint32_t *data = int_data;
-    UHash(iun) *h = uhash_alloc(iun);
+    UHash(iun) *h = uhset_alloc(iun);
 
     for (uint32_t i = 0; i < data_size; ++i) {
         int_unpack_t x;
@@ -104,7 +104,7 @@ void ht_uhash_unpack(void) {
 
 void ht_uhash_packed(void) {
     uint32_t *data = int_data;
-    UHash(ipk) *h = uhash_alloc(ipk);
+    UHash(ipk) *h = uhset_alloc(ipk);
 
     for (uint32_t i = 0; i < data_size; ++i) {
         int_packed_t x;
