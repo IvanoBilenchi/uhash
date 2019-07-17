@@ -651,15 +651,13 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * Implements a previously declared hash table type.
  *
  * @param T [symbol] Hash table name.
- * @param uhkey_t [symbol] Type of the keys.
- * @param uhval_t [symbol] Type of the values.
  * @param __hash_func [(uhkey_t) -> uhash_uint_t] Hash function.
  * @param __equal_func [(uhkey_t, uhkey_t) -> bool] Equality function.
  *
  * @public @related UHash
  */
-#define UHASH_IMPL(T, uhkey_t, uhval_t, __hash_func, __equal_func) \
-    __UHASH_IMPL(T, __uhash_unused, uhkey_t, uhval_t, __hash_func, __equal_func)
+#define UHASH_IMPL(T, __hash_func, __equal_func) \
+    __UHASH_IMPL(T, __uhash_unused, uhash_##T##_key, uhash_##T##_val, __hash_func, __equal_func)
 
 /**
  * Defines a new static hash table type.
