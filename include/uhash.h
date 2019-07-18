@@ -237,6 +237,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
     SCOPE bool uhset_replace_##T(UHash_##T *h, uhkey_t key, uhkey_t *replaced);                     \
     SCOPE bool uhset_remove_##T(UHash_##T *h, uhkey_t key, uhkey_t *removed);                       \
     SCOPE bool uhset_is_superset_##T(UHash_##T const *h1, UHash_##T const *h2);                     \
+    SCOPE bool uhset_union_##T(UHash_##T *h1, UHash_##T const *h2);                                 \
+    SCOPE void uhset_intersect_##T(UHash_##T *h1, UHash_##T const *h2);                             \
     SCOPE uhash_uint_t uhset_hash_##T(UHash_##T const *h);                                          \
     SCOPE uhkey_t uhset_get_any_##T(UHash_##T const *h, uhkey_t if_empty);                          \
     /** @endcond */
@@ -598,6 +600,23 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
             }                                                                                       \
         }                                                                                           \
         return true;                                                                                \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE bool uhset_union_##T(UHash_##T *h1, UHash_##T const *h2) {                                \
+        for (uhash_uint_t i = 0; i != h2->n_buckets; ++i) {                                         \
+            if (uhash_exists(h2, i) && uhset_insert_##T(h1, h2->keys[i], NULL) == UHASH_ERROR) {    \
+                return false;                                                                       \
+            }                                                                                       \
+        }                                                                                           \
+        return true;                                                                                \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE void uhset_intersect_##T(UHash_##T *h1, UHash_##T const *h2) {                            \
+        for (uhash_uint_t i = 0; i != h1->n_buckets; ++i) {                                         \
+            if (uhash_exists(h1, i) && uhash_get_##T(h2, h1->keys[i]) == UHASH_INDEX_MISSING) {     \
+                uhash_delete_##T(h1, i);                                                            \
+            }                                                                                       \
+        }                                                                                           \
     }                                                                                               \
                                                                                                     \
     SCOPE uhash_uint_t uhset_hash_##T(UHash_##T const *h) {                                         \
@@ -1150,6 +1169,29 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  * @public @related UHash
  */
 #define uhset_is_superset(T, h1, h2) uhset_is_superset_##T(h1, h2)
+
+/**
+ * Performs the union between two sets, mutating the first.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h1 [UHash(T)*] Set to mutate.
+ * @param h2 [UHash(T)*] Other set.
+ * @return [bool] True if the operation succeeded, false otherwise.
+ *
+ * @public @related UHash
+ */
+#define uhset_union(T, h1, h2) uhset_union_##T(h1, h2)
+
+/**
+ * Performs the intersection between two sets, mutating the first.
+ *
+ * @param T [symbol] Hash table name.
+ * @param h1 [UHash(T)*] Set to mutate.
+ * @param h2 [UHash(T)*] Other set.
+ *
+ * @public @related UHash
+ */
+#define uhset_intersect(T, h1, h2) uhset_intersect_##T(h1, h2)
 
 /**
  * Checks whether the set is equal to another set.

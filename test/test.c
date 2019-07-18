@@ -174,6 +174,18 @@ static bool test_set(void) {
     uhash_free(IntHash, other_set);
     other_set = uhash_copy(IntHash, set);
     uhash_assert(uhset_equals(IntHash, set, other_set));
+    uhash_free(IntHash, other_set);
+
+    other_set = uhset_alloc(IntHash);
+    uhset_insert(IntHash, other_set, max);
+    uhset_union(IntHash, other_set, set);
+
+    uhash_assert(uhset_is_superset(IntHash, other_set, set));
+    uhash_assert(!uhset_is_superset(IntHash, set, other_set));
+
+    uhset_intersect(IntHash, other_set, set);
+    uhash_assert(uhset_equals(IntHash, other_set, set));
+    uhash_free(IntHash, other_set);
 
     uint32_t element = uhset_get_any(IntHash, set, max);
     uhash_assert(element != max);
