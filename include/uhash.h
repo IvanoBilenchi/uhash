@@ -774,6 +774,15 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
  */
 #define UHash(T) UHash_##T
 
+/**
+ * Expands to 'struct UHash_T', useful for forward-declarations.
+ *
+ * @param T [symbol] Hash table name.
+ *
+ * @public @related UHash
+ */
+#define uhash_struct(T) struct UHash_##T
+
 /// @name Memory management
 
 /**
