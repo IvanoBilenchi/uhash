@@ -6,7 +6,7 @@
  * @author Ivano Bilenchi (uHash)
  *
  * @copyright Copyright (c) 2008, 2009, 2011 Attractive Chaos <attractor@live.co.uk>
- * @copyright Copyright (c) 2019 Ivano Bilenchi <https://ivanobilenchi.com>
+ * @copyright Copyright (c) 2019-2020 Ivano Bilenchi <https://ivanobilenchi.com>
  * @copyright SPDX-License-Identifier: MIT
  *
  * @file
@@ -117,6 +117,21 @@ typedef enum uhash_ret_t {
     #define __uhash_analyzer_assert(c) do { if (!(c)) exit(1); } while(0)
 #else
     #define __uhash_analyzer_assert(c)
+#endif
+
+/// malloc override.
+#ifndef UHASH_MALLOC
+    #define UHASH_MALLOC malloc
+#endif
+
+/// realloc override.
+#ifndef UHASH_REALLOC
+    #define UHASH_REALLOC realloc
+#endif
+
+/// free override.
+#ifndef UHASH_FREE
+    #define UHASH_FREE free
 #endif
 
 /// Flags manipulation macros.
@@ -257,17 +272,17 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
                                                                                                     \
     SCOPE void uhash_free_##T(UHash_##T *h) {                                                       \
         if (!h) return;                                                                             \
-        free((void *)h->keys);                                                                      \
-        free((void *)h->vals);                                                                      \
-        free(h->flags);                                                                             \
-        free(h);                                                                                    \
+        UHASH_FREE((void *)h->keys);                                                                \
+        UHASH_FREE((void *)h->vals);                                                                \
+        UHASH_FREE(h->flags);                                                                       \
+        UHASH_FREE(h);                                                                              \
     }                                                                                               \
                                                                                                     \
     SCOPE UHash_##T* uhash_copy_##T(UHash_##T const *h) {                                           \
         UHash_##T *copy = uhash_copy_as_set_##T(h);                                                 \
         if (h->vals) {                                                                              \
             uhash_uint_t n_buckets = h->n_buckets;                                                  \
-            copy->vals = malloc(n_buckets * sizeof(*copy->vals));                                   \
+            copy->vals = UHASH_MALLOC(n_buckets * sizeof(*copy->vals));                             \
             memcpy(copy->vals, h->vals, n_buckets * sizeof(*copy->vals));                           \
         }                                                                                           \
         return copy;                                                                                \
@@ -277,8 +292,8 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
         UHash_##T *copy = uhset_alloc_##T();                                                        \
         uhash_uint_t n_buckets = h->n_buckets;                                                      \
         uhash_uint_t n_flags = __uhf_size(n_buckets);                                               \
-        copy->flags = malloc(n_flags * sizeof(*copy->flags));                                       \
-        copy->keys = malloc(n_buckets * sizeof(*copy->keys));                                       \
+        copy->flags = UHASH_MALLOC(n_flags * sizeof(*copy->flags));                                 \
+        copy->keys = UHASH_MALLOC(n_buckets * sizeof(*copy->keys));                                 \
         memcpy(copy->flags, h->flags, n_flags * sizeof(*copy->flags));                              \
         memcpy(copy->keys, h->keys, n_buckets * sizeof(*copy->keys));                               \
         copy->n_buckets = n_buckets;                                                                \
@@ -324,31 +339,31 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
                 j = 0;                                                                              \
             } else {                                                                                \
                 /* Hash table size needs to be changed (shrink or expand): rehash. */               \
-                new_flags = malloc(__uhf_size(new_n_buckets) * sizeof(*new_flags));                 \
+                new_flags = UHASH_MALLOC(__uhf_size(new_n_buckets) * sizeof(*new_flags));           \
                 if (!new_flags) return false;                                                       \
                                                                                                     \
                 memset(new_flags, 0xaa, __uhf_size(new_n_buckets) * sizeof(*new_flags));            \
                                                                                                     \
                 if (h->n_buckets < new_n_buckets) {                                                 \
                     /* Expand. */                                                                   \
-                    uhkey_t *new_keys = realloc(h->keys, new_n_buckets * sizeof(*new_keys));        \
+                    uhkey_t *new_keys = UHASH_REALLOC(h->keys, new_n_buckets * sizeof(*new_keys));  \
                                                                                                     \
                     if (!new_keys) {                                                                \
-                        free(new_flags);                                                            \
+                        UHASH_FREE(new_flags);                                                      \
                         return false;                                                               \
                     }                                                                               \
                                                                                                     \
                     h->keys = new_keys;                                                             \
                                                                                                     \
                     if (h->vals) {                                                                  \
-                        uhval_t *new_vals = realloc(h->vals, new_n_buckets * sizeof(*new_vals));    \
+                        uhval_t *nvals = UHASH_REALLOC(h->vals, new_n_buckets * sizeof(*nvals));    \
                                                                                                     \
-                        if (!new_vals) {                                                            \
-                            free(new_flags);                                                        \
+                        if (!nvals) {                                                               \
+                            UHASH_FREE(new_flags);                                                  \
                             return false;                                                           \
                         }                                                                           \
                                                                                                     \
-                        h->vals = new_vals;                                                         \
+                        h->vals = nvals;                                                            \
                     }                                                                               \
                 } /* Otherwise shrink. */                                                           \
             }                                                                                       \
@@ -391,12 +406,12 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
                                                                                                     \
         if (h->n_buckets > new_n_buckets) {                                                         \
             /* Shrink the hash table. */                                                            \
-            h->keys = realloc(h->keys, new_n_buckets * sizeof(*h->keys));                           \
-            if (h->vals) h->vals = realloc(h->vals, new_n_buckets * sizeof(*h->vals));              \
+            h->keys = UHASH_REALLOC(h->keys, new_n_buckets * sizeof(*h->keys));                     \
+            if (h->vals) h->vals = UHASH_REALLOC(h->vals, new_n_buckets * sizeof(*h->vals));        \
         }                                                                                           \
                                                                                                     \
         /* Free the working space. */                                                               \
-        free(h->flags);                                                                             \
+        UHASH_FREE(h->flags);                                                                       \
         h->flags = new_flags;                                                                       \
         h->n_buckets = new_n_buckets;                                                               \
         h->n_occupied = h->count;                                                                   \
@@ -490,7 +505,7 @@ __uhash_static_inline uhash_uint_t __uhash_x31_str_hash(char const *key) {
             return NULL;                                                                            \
         }                                                                                           \
                                                                                                     \
-        map->vals = malloc(map->n_buckets * sizeof(*map->vals));                                    \
+        map->vals = UHASH_MALLOC(map->n_buckets * sizeof(*map->vals));                              \
                                                                                                     \
         if (!map->vals) {                                                                           \
             uhash_free_##T(map);                                                                    \
