@@ -14,7 +14,7 @@
 
 /// @name Utility macros
 
-#define array_size(array) (sizeof(array) / sizeof(*array))
+#define array_size(array) (sizeof(array) / sizeof(*(array)))
 
 #define uhash_assert(exp) do {                                                                      \
     if (!(exp)) {                                                                                   \
@@ -29,16 +29,20 @@ UHASH_INIT(IntHash, uint32_t, uint32_t, uhash_int32_hash, uhash_identical)
 
 static bool test_memory(void) {
     UHash(IntHash) *set = uhset_alloc(IntHash);
-    uhash_ret_t ret;
-    uhash_put(IntHash, set, 0, &ret);
+    uhash_assert(set);
+
+    uhash_ret_t ret = uhash_put(IntHash, set, 0, NULL);
+    uhash_assert(ret == UHASH_INSERTED);
     uhash_assert(uhash_count(set) == 1);
 
     uhash_uint_t buckets = set->n_buckets;
-    uhash_resize(IntHash, set, 200);
+    ret = uhash_resize(IntHash, set, 200);
+    uhash_assert(ret == UHASH_OK);
     uhash_assert(set->n_buckets > buckets);
 
     buckets = set->n_buckets;
-    uhash_resize(IntHash, set, 100);
+    ret = uhash_resize(IntHash, set, 100);
+    uhash_assert(ret == UHASH_OK);
     uhash_assert(set->n_buckets < buckets);
 
     buckets = set->n_buckets;
@@ -55,14 +59,13 @@ static bool test_memory(void) {
 static bool test_base(void) {
     uint32_t const max = 100;
     UHash(IntHash) *set = uhset_alloc(IntHash);
+    uhash_assert(set);
 
     uhash_assert(uhash_get(IntHash, set, 0) == UHASH_INDEX_MISSING);
     uhash_assert(uhash_count(set) == 0);
 
     for (uint32_t i = 0; i < max; ++i) {
-        uhash_ret_t ret;
-        uhash_put(IntHash, set, i, &ret);
-        uhash_assert(ret == UHASH_INSERTED);
+        uhash_assert(uhash_put(IntHash, set, i, NULL) == UHASH_INSERTED);
     }
 
     uhash_assert(uhash_count(set) == max);
@@ -91,12 +94,14 @@ static bool test_base(void) {
 static bool test_map(void) {
     uint32_t const max = 100;
     UHash(IntHash) *map = uhmap_alloc(IntHash);
+    uhash_assert(map);
 
     for (uint32_t i = 0; i < max; ++i) {
         uhash_assert(uhmap_set(IntHash, map, i, i, NULL) == UHASH_INSERTED);
     }
 
     UHash(IntHash) *set = uhash_copy_as_set(IntHash, map);
+    uhash_assert(set);
     uhash_assert(uhset_equals(IntHash, set, map));
     uhash_free(IntHash, set);
 
@@ -128,6 +133,7 @@ static bool test_map(void) {
 static bool test_set(void) {
     uint32_t const max = 100;
     UHash(IntHash) *set = uhset_alloc(IntHash);
+    uhash_assert(set);
     
     for (uint32_t i = 0; i < max; ++i) {
         uhash_assert(uhset_insert(IntHash, set, i) == UHASH_INSERTED);
@@ -161,6 +167,7 @@ static bool test_set(void) {
     }
 
     UHash(IntHash) *other_set = uhset_alloc(IntHash);
+    uhash_assert(other_set);
     uhset_insert_all(IntHash, set, elements, max);
     uhset_insert_all(IntHash, other_set, elements, max / 2);
 
@@ -173,12 +180,14 @@ static bool test_set(void) {
 
     uhash_free(IntHash, other_set);
     other_set = uhash_copy(IntHash, set);
+    uhash_assert(other_set);
     uhash_assert(uhset_equals(IntHash, set, other_set));
     uhash_free(IntHash, other_set);
 
     other_set = uhset_alloc(IntHash);
+    uhash_assert(other_set);
     uhset_insert(IntHash, other_set, max);
-    uhset_union(IntHash, other_set, set);
+    uhash_assert(uhset_union(IntHash, other_set, set) == UHASH_OK);
 
     uhash_assert(uhset_is_superset(IntHash, other_set, set));
     uhash_assert(!uhset_is_superset(IntHash, set, other_set));

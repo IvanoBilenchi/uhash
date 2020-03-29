@@ -47,7 +47,7 @@ void ht_init_data(void) {
     str_data = calloc(data_size, sizeof(*str_data));
 
     for (uint32_t i = 0; i < data_size; ++i) {
-        int_data[i] = (uint32_t)(data_size * ((double)x / UINT32_MAX) / 4) * 271828183u;
+        int_data[i] = (uint32_t)(data_size * ((double)x / UINT32_MAX) / 4) * 271828183U;
         sprintf(buf, "%x", int_data[i]);
         str_data[i] = strdup(buf);
         x = 1664525L * x + 1013904223L;
@@ -65,8 +65,9 @@ void ht_uhash_int(void) {
     UHash(int) *h = uhmap_alloc(int);
 
     for (uint32_t i = 0; i < data_size; ++i) {
-        uhash_uint_t k = uhash_put(int, h, data[i], NULL);
-        uhash_value(h, k) = i&0xff;
+        uhash_uint_t k;
+        uhash_put(int, h, data[i], &k);
+        uhash_value(h, k) = i&0xffU;
     }
 
     uint64_t count = uhash_count(h);
@@ -93,7 +94,7 @@ void ht_uhash_unpack(void) {
 
     for (uint32_t i = 0; i < data_size; ++i) {
         int_unpack_t x;
-        x.key = data[i]; x.val = i&0xff;
+        x.key = data[i]; x.val = i&0xffU;
         uhash_put(iun, h, x, NULL);
     }
 
@@ -108,7 +109,7 @@ void ht_uhash_packed(void) {
 
     for (uint32_t i = 0; i < data_size; ++i) {
         int_packed_t x;
-        x.key = data[i]; x.val = i&0xff;
+        x.key = data[i]; x.val = i&0xffU;
         uhash_put(ipk, h, x, NULL);
     }
 
@@ -124,7 +125,7 @@ void ht_timing(void (*f)(void)) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc > 1) data_size = atoi(argv[1]);
+    if (argc > 1) data_size = strtoul(argv[1], NULL, 10);
 
     printf("Starting benchmark...\n");
 
