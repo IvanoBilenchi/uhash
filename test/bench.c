@@ -50,7 +50,7 @@ void ht_init_data(void) {
         int_data[i] = (uint32_t)(data_size * ((double)x / UINT32_MAX) / 4) * 271828183U;
         sprintf(buf, "%x", int_data[i]);
         str_data[i] = strdup(buf);
-        x = 1664525L * x + 1013904223L;
+        x = 1664525 * x + 1013904223;
     }
 }
 
@@ -67,7 +67,7 @@ void ht_uhash_int(void) {
     for (uint32_t i = 0; i < data_size; ++i) {
         uhash_uint_t k;
         uhash_put(int, h, data[i], &k);
-        uhash_value(h, k) = i&0xffU;
+        uhash_value(h, k) = (unsigned char)(i & 0xffU);
     }
 
     uint64_t count = uhash_count(h);
@@ -94,7 +94,8 @@ void ht_uhash_unpack(void) {
 
     for (uint32_t i = 0; i < data_size; ++i) {
         int_unpack_t x;
-        x.key = data[i]; x.val = i&0xffU;
+        x.key = data[i];
+        x.val = (unsigned char)(i & 0xffU);
         uhash_put(iun, h, x, NULL);
     }
 
@@ -109,7 +110,8 @@ void ht_uhash_packed(void) {
 
     for (uint32_t i = 0; i < data_size; ++i) {
         int_packed_t x;
-        x.key = data[i]; x.val = i&0xffU;
+        x.key = data[i];
+        x.val = (unsigned char)(i & 0xffU);
         uhash_put(ipk, h, x, NULL);
     }
 
@@ -125,7 +127,7 @@ void ht_timing(void (*f)(void)) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc > 1) data_size = strtoul(argv[1], NULL, 10);
+    if (argc > 1) data_size = (uint32_t)strtoul(argv[1], NULL, 10);
 
     printf("Starting benchmark...\n");
 
