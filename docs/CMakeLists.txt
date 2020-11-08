@@ -1,7 +1,7 @@
 # Files and directories
 
-set(README_FILE "${UH_PROJECT_DIR}/README.md")
-set(DOCS_OUTPUT_DIRECTORY "${UH_OUTPUT_DIR}/docs")
+set(README_FILE "../README.md")
+get_target_property(HEADERS uhash INTERFACE_SOURCES)
 
 # Doxygen configuration
 
@@ -19,13 +19,12 @@ set(DOXYGEN_USE_MDFILE_AS_MAINPAGE "${README_FILE}")
 set(DOXYGEN_ALPHABETICAL_INDEX NO)
 set(DOXYGEN_IGNORE_PREFIX "UHASH_" "UHash_" "uhash_")
 set(DOXYGEN_MACRO_EXPANSION YES)
-set(DOXYGEN_OUTPUT_DIRECTORY "${DOCS_OUTPUT_DIRECTORY}")
+set(DOXYGEN_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}")
 
 # Documentation target
 
 find_package(Doxygen)
 
 if(DOXYGEN_FOUND)
-    doxygen_add_docs(uhash-docs "${README_FILE}" "${UH_HEADER}"
-                     COMMENT "Generate documentation")
+    doxygen_add_docs(uhash-docs "${README_FILE}" ${HEADERS} COMMENT "Generate documentation")
 endif()
