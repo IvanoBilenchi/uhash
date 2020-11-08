@@ -65,7 +65,7 @@ void ht_uhash_int(void) {
     UHash(int) *h = uhmap_alloc(int);
 
     for (uint32_t i = 0; i < data_size; ++i) {
-        uhash_uint_t k;
+        uhash_uint k;
         uhash_put(int, h, data[i], &k);
         uhash_value(h, k) = (unsigned char)(i & 0xffU);
     }

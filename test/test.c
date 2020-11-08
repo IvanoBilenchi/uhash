@@ -31,11 +31,11 @@ static bool test_memory(void) {
     UHash(IntHash) *set = uhset_alloc(IntHash);
     uhash_assert(set);
 
-    uhash_ret_t ret = uhash_put(IntHash, set, 0, NULL);
+    uhash_ret ret = uhash_put(IntHash, set, 0, NULL);
     uhash_assert(ret == UHASH_INSERTED);
     uhash_assert(uhash_count(set) == 1);
 
-    uhash_uint_t buckets = set->n_buckets;
+    uhash_uint buckets = set->n_buckets;
     ret = uhash_resize(IntHash, set, 200);
     uhash_assert(ret == UHASH_OK);
     uhash_assert(set->n_buckets > buckets);
@@ -71,7 +71,7 @@ static bool test_base(void) {
     uhash_assert(uhash_count(set) == max);
 
     for (uint32_t i = 0; i < max; ++i) {
-        uhash_uint_t idx = uhash_get(IntHash, set, i);
+        uhash_uint idx = uhash_get(IntHash, set, i);
         uhash_assert(idx != UHASH_INDEX_MISSING);
         uhash_assert(uhash_exists(set, idx));
     }
@@ -79,7 +79,7 @@ static bool test_base(void) {
     uhash_assert(uhash_get(IntHash, set, 200) == UHASH_INDEX_MISSING);
 
     for (uint32_t i = 0; i < max; ++i) {
-        uhash_uint_t idx = uhash_get(IntHash, set, i);
+        uhash_uint idx = uhash_get(IntHash, set, i);
         uhash_delete(IntHash, set, idx);
         uhash_assert(!uhash_exists(set, idx));
         uhash_assert(uhash_get(IntHash, set, i) == UHASH_INDEX_MISSING);
