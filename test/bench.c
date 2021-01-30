@@ -19,6 +19,14 @@
 UHASH_INIT(str, char*, UHASH_VAL_IGNORE, uhash_str_hash, uhash_str_equals)
 UHASH_INIT(int, uint32_t, unsigned char, uhash_int32_hash, uhash_identical)
 
+static uhash_uint int_hash(uint32_t num) { return uhash_int32_hash(num); }
+static bool int_eq(uint32_t lhs, uint32_t rhs) { return lhs == rhs; }
+UHASH_INIT_PI(intpi, uint32_t, unsigned char)
+
+static uhash_uint str_hash(char *str) { return uhash_str_hash(str); }
+static bool str_eq(char *lhs, char *rhs) { return strcmp(lhs, rhs) == 0; }
+UHASH_INIT_PI(strpi, char*, UHASH_VAL_IGNORE)
+
 typedef struct {
     uint32_t key;
     unsigned char val;
@@ -75,6 +83,21 @@ void ht_uhash_int(void) {
     uhash_free(int, h);
 }
 
+void ht_uhash_int_pi(void) {
+    uint32_t *data = int_data;
+    UHash(intpi) *h = uhmap_alloc_pi(intpi, int_hash, int_eq);
+
+    for (uint32_t i = 0; i < data_size; ++i) {
+        uhash_uint k;
+        uhash_put(intpi, h, data[i], &k);
+        uhash_value(h, k) = (unsigned char)(i & 0xffU);
+    }
+
+    uint64_t count = uhash_count(h);
+    printf("[ht_uhash_int] size: %llu\n", count);
+    uhash_free(intpi, h);
+}
+
 void ht_uhash_str(void) {
     char **data = str_data;
     UHash(str) *h = uhset_alloc(str);
@@ -86,6 +109,19 @@ void ht_uhash_str(void) {
     uint64_t count = uhash_count(h);
     printf("[ht_uhash_int] size: %llu\n", count);
     uhash_free(str, h);
+}
+
+void ht_uhash_str_pi(void) {
+    char **data = str_data;
+    UHash(strpi) *h = uhset_alloc_pi(strpi, str_hash, str_eq);
+
+    for (uint32_t i = 0; i < data_size; ++i) {
+        uhash_put(strpi, h, data[i], NULL);
+    }
+
+    uint64_t count = uhash_count(h);
+    printf("[ht_uhash_int] size: %llu\n", count);
+    uhash_free(strpi, h);
 }
 
 void ht_uhash_unpack(void) {
@@ -133,7 +169,9 @@ int main(int argc, char *argv[]) {
 
     ht_init_data();
     ht_timing(ht_uhash_int);
+    ht_timing(ht_uhash_int_pi);
     ht_timing(ht_uhash_str);
+    ht_timing(ht_uhash_str_pi);
     ht_timing(ht_uhash_unpack);
     ht_timing(ht_uhash_packed);
     ht_destroy_data();

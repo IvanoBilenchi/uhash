@@ -204,14 +204,7 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
     #define p_uhash_int64_hash(key) (uhash_uint)((key) >> 33U ^ (key) ^ (key) << 11U)
 #endif
 
-/**
- * Defines a new hash table type.
- *
- * @param T [symbol] Hash table name.
- * @param uh_key [type] Hash table key type.
- * @param uh_val [type] Hash table value type.
- */
-#define P_UHASH_DEF_TYPE(T, uh_key, uh_val)                                                         \
+#define P_UHASH_DEF_TYPE_HEAD(T, uh_key, uh_val)                                                    \
     typedef struct UHash_##T {                                                                      \
         /** @cond */                                                                                \
         uhash_uint n_buckets;                                                                       \
@@ -220,13 +213,39 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
         uint32_t *flags;                                                                            \
         uh_key *keys;                                                                               \
         uh_val *vals;                                                                               \
-        /** @endcond */                                                                             \
+        /** @endcond */
+
+#define P_UHASH_DEF_TYPE_FOOT(T, uh_key, uh_val)                                                    \
     } UHash_##T;                                                                                    \
                                                                                                     \
     /** @cond */                                                                                    \
     typedef uh_key uhash_##T##_key;                                                                 \
     typedef uh_val uhash_##T##_val;                                                                 \
     /** @endcond */
+
+/**
+ * Defines a new hash table type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param uh_key [type] Hash table key type.
+ * @param uh_val [type] Hash table value type.
+ */
+#define P_UHASH_DEF_TYPE(T, uh_key, uh_val)                                                         \
+    P_UHASH_DEF_TYPE_HEAD(T, uh_key, uh_val)                                                        \
+    P_UHASH_DEF_TYPE_FOOT(T, uh_key, uh_val)
+
+/**
+ * Defines a new hash table type with per-instance hash and equality functions.
+ *
+ * @param T [symbol] Hash table name.
+ * @param uh_key [type] Hash table key type.
+ * @param uh_val [type] Hash table value type.
+ */
+#define P_UHASH_DEF_TYPE_PI(T, uh_key, uh_val) \
+    P_UHASH_DEF_TYPE_HEAD(T, uh_key, uh_val)                                                        \
+    uhash_uint (*hfunc)(uh_key key);                                                                \
+    bool (*efunc)(uh_key lhs, uh_key rhs);                                                          \
+    P_UHASH_DEF_TYPE_FOOT(T, uh_key, uh_val)
 
 /**
  * Generates function declarations for the specified hash table type.
@@ -239,8 +258,8 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
 #define P_UHASH_DECL(T, SCOPE, uh_key, uh_val)                                                      \
     /** @cond */                                                                                    \
     SCOPE void uhash_free_##T(UHash_##T *h);                                                        \
-    SCOPE UHash_##T* uhash_copy_##T(UHash_##T const *h);                                            \
-    SCOPE UHash_##T* uhash_copy_as_set_##T(UHash_##T const *h);                                     \
+    SCOPE uhash_ret uhash_copy_##T(UHash_##T const *src, UHash_##T *dest);                          \
+    SCOPE uhash_ret uhash_copy_as_set_##T(UHash_##T const *src, UHash_##T *dest);                   \
     SCOPE void uhash_clear_##T(UHash_##T *h);                                                       \
     SCOPE uhash_uint uhash_get_##T(UHash_##T const *h, uh_key key);                                 \
     SCOPE uhash_ret uhash_resize_##T(UHash_##T *h, uhash_uint new_n_buckets);                       \
@@ -265,6 +284,24 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
     /** @endcond */
 
 /**
+ * Generates function declarations for the specified hash table type
+ * with per-instance hash and equality functions.
+ *
+ * @param T [symbol] Hash table name.
+ * @param SCOPE [scope] Scope of the declarations.
+ * @param uh_key [type] Hash table key type.
+ * @param uh_val [type] Hash table value type.
+ */
+#define P_UHASH_DECL_PI(T, SCOPE, uh_key, uh_val)                                                   \
+    P_UHASH_DECL(T, SCOPE, uh_key, uh_val)                                                          \
+    /** @cond */                                                                                    \
+    SCOPE UHash_##T* uhmap_alloc_pi_##T(uhash_uint (*hash_func)(uh_key key),                        \
+                                        bool (*equal_func)(uh_key lhs, uh_key rhs));                \
+    SCOPE UHash_##T* uhset_alloc_pi_##T(uhash_uint (*hash_func)(uh_key key),                        \
+                                        bool (*equal_func)(uh_key lhs, uh_key rhs));                \
+    /** @endcond */
+
+/**
  * Generates function definitions for the specified hash table type.
  *
  * @param T [symbol] Hash table name.
@@ -284,45 +321,45 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
         UHASH_FREE(h);                                                                              \
     }                                                                                               \
                                                                                                     \
-    SCOPE UHash_##T* uhash_copy_##T(UHash_##T const *h) {                                           \
-        UHash_##T *copy = uhash_copy_as_set_##T(h);                                                 \
-        if (copy && h->vals) {                                                                      \
-            uhash_uint n_buckets = h->n_buckets;                                                    \
-            copy->vals = UHASH_MALLOC(n_buckets * sizeof(uh_val));                                  \
+    SCOPE uhash_ret uhash_copy_##T(UHash_##T const *src, UHash_##T *dest) {                         \
+        uhash_ret ret = uhash_copy_as_set_##T(src, dest);                                           \
                                                                                                     \
-            if (copy->vals) {                                                                       \
-                memcpy(copy->vals, h->vals, n_buckets * sizeof(uh_val));                            \
+        if (ret == UHASH_OK && src->vals) {                                                         \
+            uhash_uint n_buckets = src->n_buckets;                                                  \
+            uh_val *new_vals = UHASH_REALLOC(dest->vals, n_buckets * sizeof(uh_val));               \
+            if (new_vals) {                                                                         \
+                memcpy(new_vals, src->vals, n_buckets * sizeof(uh_val));                            \
+                dest->vals = new_vals;                                                              \
             } else {                                                                                \
-                uhash_free_##T(copy);                                                               \
-                copy = NULL;                                                                        \
+                ret = UHASH_ERR;                                                                    \
             }                                                                                       \
         }                                                                                           \
-        return copy;                                                                                \
+                                                                                                    \
+        return ret;                                                                                 \
     }                                                                                               \
                                                                                                     \
-    SCOPE UHash_##T* uhash_copy_as_set_##T(UHash_##T const *h) {                                    \
-        UHash_##T *copy = uhset_alloc_##T();                                                        \
+    SCOPE uhash_ret uhash_copy_as_set_##T(UHash_##T const *src, UHash_##T *dest) {                  \
+        uhash_ret ret = UHASH_OK;                                                                   \
                                                                                                     \
-        if (copy) {                                                                                 \
-            uhash_uint n_buckets = h->n_buckets;                                                    \
-            uhash_uint n_flags = p_uhf_size(n_buckets);                                             \
+        uhash_uint n_buckets = src->n_buckets;                                                      \
+        uhash_uint n_flags = p_uhf_size(n_buckets);                                                 \
                                                                                                     \
-            copy->flags = UHASH_MALLOC(n_flags * sizeof(uint32_t));                                 \
-            copy->keys = UHASH_MALLOC(n_buckets * sizeof(uh_key));                                  \
+        uint32_t *new_flags = UHASH_REALLOC(dest->flags, n_flags * sizeof(uint32_t));               \
+        uh_key *new_keys = UHASH_REALLOC(dest->keys, n_buckets * sizeof(uh_key));                   \
                                                                                                     \
-            if (copy->flags && copy->keys) {                                                        \
-                memcpy(copy->flags, h->flags, n_flags * sizeof(uint32_t));                          \
-                memcpy(copy->keys, h->keys, n_buckets * sizeof(uh_key));                            \
-                copy->n_buckets = n_buckets;                                                        \
-                copy->n_occupied = h->n_occupied;                                                   \
-                copy->count = h->count;                                                             \
-            } else {                                                                                \
-                uhash_free_##T(copy);                                                               \
-                copy = NULL;                                                                        \
-            }                                                                                       \
+        if (new_flags && new_keys) {                                                                \
+            memcpy(new_flags, src->flags, n_flags * sizeof(uint32_t));                              \
+            memcpy(new_keys, src->keys, n_buckets * sizeof(uh_key));                                \
+            dest->flags = new_flags;                                                                \
+            dest->keys = new_keys;                                                                  \
+            dest->n_buckets = n_buckets;                                                            \
+            dest->n_occupied = src->n_occupied;                                                     \
+            dest->count = src->count;                                                               \
+        } else {                                                                                    \
+            ret = UHASH_ERR;                                                                        \
         }                                                                                           \
                                                                                                     \
-        return copy;                                                                                \
+        return ret;                                                                                 \
     }                                                                                               \
                                                                                                     \
     SCOPE void uhash_clear_##T(UHash_##T *h) {                                                      \
@@ -687,6 +724,34 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
         return i == h->n_buckets ? if_empty : h->keys[i];                                           \
     }
 
+/**
+ * Generates function definitions for the specified hash table type
+ * with per-instance hash and equality functions.
+ *
+ * @param T [symbol] Hash table name.
+ * @param SCOPE [scope] Scope of the definitions.
+ * @param uh_key [type] Hash table key type.
+ * @param uh_val [type] Hash table value type.
+ */
+#define P_UHASH_IMPL_PI(T, SCOPE, uh_key, uh_val)                                                   \
+    P_UHASH_IMPL(T, SCOPE, uh_key, uh_val, h->hfunc, h->efunc)                                      \
+                                                                                                    \
+    SCOPE UHash_##T* uhmap_alloc_pi_##T(uhash_uint (*hash_func)(uh_key key),                        \
+                                        bool (*equal_func)(uh_key lhs, uh_key rhs)) {               \
+        UHash_##T *h = uhmap_alloc_##T();                                                           \
+        h->hfunc = hash_func;                                                                       \
+        h->efunc = equal_func;                                                                      \
+        return h;                                                                                   \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE UHash_##T* uhset_alloc_pi_##T(uhash_uint (*hash_func)(uh_key key),                        \
+                                        bool (*equal_func)(uh_key lhs, uh_key rhs)) {               \
+        UHash_##T *h = uhset_alloc_##T();                                                           \
+        h->hfunc = hash_func;                                                                       \
+        h->efunc = equal_func;                                                                      \
+        return h;                                                                                   \
+    }
+
 // ##############
 // # Public API #
 // ##############
@@ -721,6 +786,34 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
     P_UHASH_DECL(T, SPEC p_uhash_unused, uh_key, uh_val)
 
 /**
+ * Declares a new hash table type with per-instance hash and equality functions.
+ *
+ * @param T [symbol] Hash table name.
+ * @param uh_key [symbol] Type of the keys.
+ * @param uh_val [symbol] Type of the values.
+ *
+ * @public @related UHash
+ */
+#define UHASH_DECL_PI(T, uh_key, uh_val)                                                            \
+    P_UHASH_DEF_TYPE_PI(T, uh_key, uh_val)                                                          \
+    P_UHASH_DECL_PI(T, p_uhash_unused, uh_key, uh_val)
+
+/**
+ * Declares a new hash table type with per-instance hash and equality functions,
+ * prepending a specifier to the generated declarations.
+ *
+ * @param T [symbol] Hash table name.
+ * @param uh_key [symbol] Type of the keys.
+ * @param uh_val [symbol] Type of the values.
+ * @param SPEC [specifier] Specifier.
+ *
+ * @public @related UHash
+ */
+#define UHASH_DECL_PI_SPEC(T, uh_key, uh_val, SPEC)                                                 \
+    P_UHASH_DEF_TYPE_PI(T, uh_key, uh_val)                                                          \
+    P_UHASH_DECL_PI(T, SPEC p_uhash_unused, uh_key, uh_val)
+
+/**
  * Implements a previously declared hash table type.
  *
  * @param T [symbol] Hash table name.
@@ -731,6 +824,16 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
  */
 #define UHASH_IMPL(T, hash_func, equal_func) \
     P_UHASH_IMPL(T, p_uhash_unused, uhash_##T##_key, uhash_##T##_val, hash_func, equal_func)
+
+/**
+ * Implements a previously declared hash table type with per-instance hash and equality functions.
+ *
+ * @param T [symbol] Hash table name.
+ *
+ * @public @related UHash
+ */
+#define UHASH_IMPL_PI(T) \
+    P_UHASH_IMPL_PI(T, p_uhash_unused, uhash_##T##_key, uhash_##T##_val)
 
 /**
  * Defines a new static hash table type.
@@ -747,6 +850,20 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
     P_UHASH_DEF_TYPE(T, uh_key, uh_val)                                                             \
     P_UHASH_DECL(T, p_uhash_static_inline, uh_key, uh_val)                                          \
     P_UHASH_IMPL(T, p_uhash_static_inline, uh_key, uh_val, hash_func, equal_func)
+
+/**
+ * Defines a new static hash table type with per-instance hash and equality functions.
+ *
+ * @param T [symbol] Hash table name.
+ * @param uh_key [symbol] Type of the keys.
+ * @param uh_val [symbol] Type of the values.
+ *
+ * @public @related UHash
+ */
+#define UHASH_INIT_PI(T, uh_key, uh_val)                                                            \
+    P_UHASH_DEF_TYPE_PI(T, uh_key, uh_val)                                                          \
+    P_UHASH_DECL_PI(T, p_uhash_static_inline, uh_key, uh_val)                                       \
+    P_UHASH_IMPL_PI(T, p_uhash_static_inline, uh_key, uh_val)
 
 /// @name Hash and equality functions
 
@@ -872,22 +989,25 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
  * Copies the specified hash table.
  *
  * @param T [symbol] Hash table name.
- * @param h [UHash(T)*] Hash table to copy.
+ * @param src [UHash(T)*] Hash table to copy.
+ * @param dest [UHash(T)*] Hash table to copy into.
+ * @return [uhash_ret] UHASH_OK if the operation succeeded, UHASH_ERR on error.
  *
  * @public @related UHash
  */
-#define uhash_copy(T, h) uhash_copy_##T(h)
+#define uhash_copy(T, src, dest) uhash_copy_##T(src, dest)
 
 /**
- * Returns a new hash set obtained by copying the keys
- * of another hash table.
+ * Returns a new hash set obtained by copying the keys of another hash table.
  *
  * @param T [symbol] Hash table name.
- * @param h [UHash(T)*] Hash table to copy.
+ * @param src [UHash(T)*] Hash table to copy.
+ * @param dest [UHash(T)*] Hash table to copy into.
+ * @return [uhash_ret] UHASH_OK if the operation succeeded, UHASH_ERR on error.
  *
  * @public @related UHash
  */
-#define uhash_copy_as_set(T, h) uhash_copy_as_set_##T(h)
+#define uhash_copy_as_set(T, src, dest) uhash_copy_as_set_##T(src, dest)
 
 /**
  * Resizes the specified hash table.
@@ -1041,6 +1161,18 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
 #define uhmap_alloc(T) uhmap_alloc_##T()
 
 /**
+ * Allocates a new hash map with per-instance hash and equality functions.
+ *
+ * @param T [symbol] Hash table name.
+ * @param hash_func [(uh_key) -> uhash_uint] Hash function pointer.
+ * @param equal_func [(uh_key, uh_key) -> bool] Equality function pointer.
+ * @return [UHash(T)*] Hash table instance.
+ *
+ * @public @related UHash
+ */
+#define uhmap_alloc_pi(T, hash_func, equal_func) uhmap_alloc_pi_##T(hash_func, equal_func)
+
+/**
  * Returns the value associated with the specified key.
  *
  * @param T [symbol] Hash table name.
@@ -1132,6 +1264,18 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
  * @public @related UHash
  */
 #define uhset_alloc(T) uhset_alloc_##T()
+
+/**
+ * Allocates a new hash set with per-instance hash and equality functions.
+ *
+ * @param T [symbol] Hash table name.
+ * @param hash_func [(uh_key) -> uhash_uint] Hash function pointer.
+ * @param equal_func [(uh_key, uh_key) -> bool] Equality function pointer.
+ * @return [UHash(T)*] Hash table instance.
+ *
+ * @public @related UHash
+ */
+#define uhset_alloc_pi(T, hash_func, equal_func) uhset_alloc_pi_##T(hash_func, equal_func)
 
 /**
  * Inserts an element in the set.
