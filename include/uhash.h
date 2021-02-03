@@ -118,26 +118,26 @@ typedef enum uhash_ret {
 /// Specifier for static inline definitions.
 #define p_uhash_static_inline static p_uhash_inline p_uhash_unused
 
+/// uhash_combine_hash constants.
+#if UHASH_TINY
+    #define P_UHASH_COMBINE_MAGIC 0x9e37U
+    #define P_UHASH_COMBINE_LS 3U
+    #define P_UHASH_COMBINE_RS 1U
+#elif UHASH_HUGE
+    #define P_UHASH_COMBINE_MAGIC 0x9e3779b97f4a7c15LLU
+    #define P_UHASH_COMBINE_LS 12U
+    #define P_UHASH_COMBINE_RS 4U
+#else
+    #define P_UHASH_COMBINE_MAGIC 0x9e3779b9U
+    #define P_UHASH_COMBINE_LS 6U
+    #define P_UHASH_COMBINE_RS 2U
+#endif
+
 /// Give hints to the static analyzer.
 #if (__clang_analyzer__)
     #define p_uhash_analyzer_assert(c) do { if (!(c)) exit(1); } while(0)
 #else
     #define p_uhash_analyzer_assert(c)
-#endif
-
-/// malloc override.
-#ifndef UHASH_MALLOC
-    #define UHASH_MALLOC malloc
-#endif
-
-/// realloc override.
-#ifndef UHASH_REALLOC
-    #define UHASH_REALLOC realloc
-#endif
-
-/// free override.
-#ifndef UHASH_FREE
-    #define UHASH_FREE free
 #endif
 
 /// Flags manipulation macros.
@@ -865,6 +865,23 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
     P_UHASH_DECL_PI(T, p_uhash_static_inline, uh_key, uh_val)                                       \
     P_UHASH_IMPL_PI(T, p_uhash_static_inline, uh_key, uh_val)
 
+/// @name Memory allocation
+
+/// malloc override.
+#ifndef UHASH_MALLOC
+    #define UHASH_MALLOC malloc
+#endif
+
+/// realloc override.
+#ifndef UHASH_REALLOC
+    #define UHASH_REALLOC realloc
+#endif
+
+/// free override.
+#ifndef UHASH_FREE
+    #define UHASH_FREE free
+#endif
+
 /// @name Hash and equality functions
 
 /**
@@ -952,6 +969,20 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
 #else
     #define uhash_ptr_hash(key) p_uhash_int64_hash((uint64_t)(key))
 #endif
+
+/**
+ * Combines two hashes.
+ *
+ * @param hash_1 [uhash_uint] First hash.
+ * @param hash_2 [uhash_uint] Second hash.
+ * @return [uhash_uint] The hash value.
+ *
+ * @public @related UHash
+ */
+#define uhash_combine_hash(hash_1, hash_2) (                                                        \
+    (hash_1) ^ (hash_2) + P_UHASH_COMBINE_MAGIC +                                                   \
+    ((hash_1) << P_UHASH_COMBINE_LS) + ((hash_1) >> P_UHASH_COMBINE_RS)                             \
+)
 
 /// @name Declaration
 
