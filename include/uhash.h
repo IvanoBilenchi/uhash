@@ -97,7 +97,7 @@ typedef enum uhash_ret {
 // # Private API #
 // ###############
 
-/// Cross-platform 'inline' specifier.
+// Cross-platform 'inline' specifier.
 #ifndef p_uhash_inline
     #ifdef _MSC_VER
         #define p_uhash_inline __inline
@@ -106,7 +106,7 @@ typedef enum uhash_ret {
     #endif
 #endif
 
-/// Cross-platform 'unused' directive.
+// Cross-platform 'unused' directive.
 #ifndef p_uhash_unused
     #if (defined __clang__ && __clang_major__ >= 3) || (defined __GNUC__ && __GNUC__ >= 3)
         #define p_uhash_unused __attribute__ ((__unused__))
@@ -115,10 +115,10 @@ typedef enum uhash_ret {
     #endif
 #endif
 
-/// Specifier for static inline definitions.
+// Specifier for static inline definitions.
 #define p_uhash_static_inline static p_uhash_inline p_uhash_unused
 
-/// uhash_combine_hash constants.
+// uhash_combine_hash constants.
 #if UHASH_TINY
     #define P_UHASH_COMBINE_MAGIC 0x9e37U
     #define P_UHASH_COMBINE_LS 3U
@@ -133,14 +133,14 @@ typedef enum uhash_ret {
     #define P_UHASH_COMBINE_RS 2U
 #endif
 
-/// Give hints to the static analyzer.
+// Give hints to the static analyzer.
 #if (__clang_analyzer__)
     #define p_uhash_analyzer_assert(c) do { if (!(c)) exit(1); } while(0)
 #else
     #define p_uhash_analyzer_assert(c)
 #endif
 
-/// Flags manipulation macros.
+// Flags manipulation macros.
 #define p_uhf_size(m) ((m) < 16 ? 1 : (m) >> 4U)
 #define p_uhf_isempty(flag, i) ((flag[i >> 4U] >> ((i & 0xfU) << 1U)) & 2U)
 #define p_uhf_isdel(flag, i) ((flag[i >> 4U] >> ((i & 0xfU) << 1U)) & 1U)
@@ -150,7 +150,7 @@ typedef enum uhash_ret {
 #define p_uhf_set_isboth_false(flag, i) (flag[i >> 4U] &= ~(3UL << ((i & 0xfU) << 1U)))
 #define p_uhf_set_isdel_true(flag, i) (flag[i >> 4U] |= 1UL << ((i & 0xfU) << 1U))
 
-/**
+/*
  * Computes the maximum number of elements that the table can contain
  * before it needs to be resized in order to keep its load factor under UHASH_MAX_LOAD.
  *
@@ -159,7 +159,7 @@ typedef enum uhash_ret {
  */
 #define p_uhash_upper_bound(n_buckets) ((uhash_uint)((n_buckets) * UHASH_MAX_LOAD + 0.5))
 
-/**
+/*
  * Karl Nelson <kenelson@ece.ucdavis.edu>'s X31 string hash function.
  *
  * @param key [char const *] The string to hash.
@@ -223,7 +223,7 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
     typedef uh_val uhash_##T##_val;                                                                 \
     /** @endcond */
 
-/**
+/*
  * Defines a new hash table type.
  *
  * @param T [symbol] Hash table name.
@@ -234,7 +234,7 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
     P_UHASH_DEF_TYPE_HEAD(T, uh_key, uh_val)                                                        \
     P_UHASH_DEF_TYPE_FOOT(T, uh_key, uh_val)
 
-/**
+/*
  * Defines a new hash table type with per-instance hash and equality functions.
  *
  * @param T [symbol] Hash table name.
@@ -247,7 +247,7 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
     bool (*efunc)(uh_key lhs, uh_key rhs);                                                          \
     P_UHASH_DEF_TYPE_FOOT(T, uh_key, uh_val)
 
-/**
+/*
  * Generates function declarations for the specified hash table type.
  *
  * @param T [symbol] Hash table name.
@@ -283,7 +283,7 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
     SCOPE uh_key uhset_get_any_##T(UHash_##T const *h, uh_key if_empty);                            \
     /** @endcond */
 
-/**
+/*
  * Generates function declarations for the specified hash table type
  * with per-instance hash and equality functions.
  *
@@ -301,7 +301,7 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
                                         bool (*equal_func)(uh_key lhs, uh_key rhs));                \
     /** @endcond */
 
-/**
+/*
  * Generates function definitions for the specified hash table type.
  *
  * @param T [symbol] Hash table name.
@@ -724,7 +724,7 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
         return i == h->n_buckets ? if_empty : h->keys[i];                                           \
     }
 
-/**
+/*
  * Generates function definitions for the specified hash table type
  * with per-instance hash and equality functions.
  *
