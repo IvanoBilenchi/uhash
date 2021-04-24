@@ -32,10 +32,18 @@ typedef struct {
     unsigned char val;
 } int_unpack_t;
 
-typedef struct {
+#if defined __GNUC__
+    #define UHASH_PACK(DECL) DECL __attribute__((__packed__))
+#elif defined _MSC_VER
+    #define UHASH_PACK(DECL) __pragma(pack(push, 1)) DECL __pragma(pack(pop))
+#else
+    #define UHASH_PACK(DECL) DECL
+#endif
+
+UHASH_PACK(typedef struct {
     uint32_t key;
     unsigned char val;
-} __attribute__ ((__packed__)) int_packed_t;
+} int_packed_t);
 
 #define hash_eq(a, b) ((a).key == (b).key)
 #define hash_func(a) ((a).key)
@@ -56,8 +64,9 @@ void ht_init_data(void) {
 
     for (uint32_t i = 0; i < data_size; ++i) {
         int_data[i] = (uint32_t)(data_size * ((double)x / UINT32_MAX) / 4) * 271828183U;
-        sprintf(buf, "%x", int_data[i]);
-        str_data[i] = strdup(buf);
+        snprintf(buf, sizeof(buf), "%x", int_data[i]);
+        str_data[i] = malloc(sizeof(buf));
+        memcpy(str_data[i], buf, sizeof(buf));
         x = 1664525 * x + 1013904223;
     }
 }
@@ -136,7 +145,7 @@ void ht_uhash_unpack(void) {
     }
 
     uint64_t count = uhash_count(h);
-    printf("[ht_uhash_unpack] size: %llu (sizeof=%ld)\n", count, sizeof(int_unpack_t));
+    printf("[ht_uhash_unpack] size: %llu (sizeof=%u)\n", count, (unsigned)sizeof(int_unpack_t));
     uhash_free(iun, h);
 }
 
@@ -152,7 +161,7 @@ void ht_uhash_packed(void) {
     }
 
     uint64_t count = uhash_count(h);
-    printf("[ht_uhash_packed] size: %llu (sizeof=%ld)\n", count, sizeof(int_packed_t));
+    printf("[ht_uhash_packed] size: %llu (sizeof=%u)\n", count, (unsigned)sizeof(int_packed_t));
     uhash_free(ipk, h);
 }
 
