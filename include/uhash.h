@@ -980,7 +980,7 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
  * @public @related UHash
  */
 #define uhash_combine_hash(hash_1, hash_2) (                                                        \
-    (hash_1) ^ (hash_2) + P_UHASH_COMBINE_MAGIC +                                                   \
+    ((hash_1) ^ (hash_2)) + P_UHASH_COMBINE_MAGIC +                                                 \
     ((hash_1) << P_UHASH_COMBINE_LS) + ((hash_1) >> P_UHASH_COMBINE_RS)                             \
 )
 

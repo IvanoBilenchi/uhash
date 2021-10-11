@@ -33,17 +33,18 @@ typedef struct {
 } int_unpack_t;
 
 #if defined __GNUC__
-    #define UHASH_PACK(DECL) DECL __attribute__((__packed__))
+    #define UHASH_PACKED_STRUCT(NAME, FIELDS) typedef struct __attribute__((packed)) FIELDS NAME
 #elif defined _MSC_VER
-    #define UHASH_PACK(DECL) __pragma(pack(push, 1)) DECL __pragma(pack(pop))
+    #define UHASH_PACKED_STRUCT(NAME, FIELDS) \
+        __pragma(pack(push, 1)) typedef struct FIELDS NAME __pragma(pack(pop))
 #else
-    #define UHASH_PACK(DECL) DECL
+    #define UHASH_PACKED_STRUCT(NAME, FIELDS) typedef struct FIELDS NAME
 #endif
 
-UHASH_PACK(typedef struct {
+UHASH_PACKED_STRUCT(int_packed_t, {
     uint32_t key;
     unsigned char val;
-} int_packed_t);
+});
 
 #define hash_eq(a, b) ((a).key == (b).key)
 #define hash_func(a) ((a).key)
