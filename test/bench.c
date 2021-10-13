@@ -21,11 +21,11 @@ UHASH_INIT(int, uint32_t, unsigned char, uhash_int32_hash, uhash_identical)
 
 static uhash_uint int_hash(uint32_t num) { return uhash_int32_hash(num); }
 static bool int_eq(uint32_t lhs, uint32_t rhs) { return lhs == rhs; }
-UHASH_INIT_PI(intpi, uint32_t, unsigned char)
+UHASH_INIT_PI(intpi, uint32_t, unsigned char, NULL, NULL)
 
 static uhash_uint str_hash(char *str) { return uhash_str_hash(str); }
 static bool str_eq(char *lhs, char *rhs) { return strcmp(lhs, rhs) == 0; }
-UHASH_INIT_PI(strpi, char*, UHASH_VAL_IGNORE)
+UHASH_INIT_PI(strpi, char*, UHASH_VAL_IGNORE, NULL, NULL)
 
 typedef struct {
     uint32_t key;

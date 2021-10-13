@@ -241,7 +241,7 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
  * @param uh_key [type] Hash table key type.
  * @param uh_val [type] Hash table value type.
  */
-#define P_UHASH_DEF_TYPE_PI(T, uh_key, uh_val) \
+#define P_UHASH_DEF_TYPE_PI(T, uh_key, uh_val)                                                      \
     P_UHASH_DEF_TYPE_HEAD(T, uh_key, uh_val)                                                        \
     uhash_uint (*hfunc)(uh_key key);                                                                \
     bool (*efunc)(uh_key lhs, uh_key rhs);                                                          \
@@ -302,16 +302,67 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
     /** @endcond */
 
 /*
- * Generates function definitions for the specified hash table type.
+ * Generates allocation function definitions for the specified hash table type.
+ *
+ * @param T [symbol] Hash table name.
+ * @param SCOPE [scope] Scope of the definitions.
+ */
+#define P_UHASH_IMPL_ALLOC(T, SCOPE)                                                                \
+                                                                                                    \
+    SCOPE UHash_##T *uhset_alloc_##T(void) {                                                        \
+        UHash_##T *set = UHASH_MALLOC(sizeof(UHash_##T));                                           \
+        if (set) *set = (UHash_##T) { 0 };                                                          \
+        return set;                                                                                 \
+    }
+
+/*
+ * Generates allocation function definitions for the specified hash table type
+ * with per-instance hash and equality functions.
+ *
+ * @param T [symbol] Hash table name.
+ * @param SCOPE [scope] Scope of the definitions.
+ * @param uh_key [type] Hash table key type.
+ * @param default_hfunc [(uh_key) -> uhash_uint] Default hash function (can be NULL).
+ * @param default_efunc [(uh_key, uh_key) -> bool] Default equality function (can be NULL).
+ */
+#define P_UHASH_IMPL_ALLOC_PI(T, SCOPE, uh_key, default_hfunc, default_efunc)                       \
+                                                                                                    \
+    SCOPE UHash_##T *uhset_alloc_##T(void) {                                                        \
+        UHash_##T *set = UHASH_MALLOC(sizeof(UHash_##T));                                           \
+        if (set) *set = (UHash_##T) {                                                               \
+            .hfunc = default_hfunc,                                                                 \
+            .efunc = default_efunc                                                                  \
+        };                                                                                          \
+        return set;                                                                                 \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE UHash_##T* uhmap_alloc_pi_##T(uhash_uint (*hash_func)(uh_key key),                        \
+                                        bool (*equal_func)(uh_key lhs, uh_key rhs)) {               \
+        UHash_##T *h = uhmap_alloc_##T();                                                           \
+        h->hfunc = hash_func;                                                                       \
+        h->efunc = equal_func;                                                                      \
+        return h;                                                                                   \
+    }                                                                                               \
+                                                                                                    \
+    SCOPE UHash_##T* uhset_alloc_pi_##T(uhash_uint (*hash_func)(uh_key key),                        \
+                                        bool (*equal_func)(uh_key lhs, uh_key rhs)) {               \
+        UHash_##T *h = uhset_alloc_##T();                                                           \
+        h->hfunc = hash_func;                                                                       \
+        h->efunc = equal_func;                                                                      \
+        return h;                                                                                   \
+    }
+
+/*
+ * Generates common function definitions for the specified hash table type.
  *
  * @param T [symbol] Hash table name.
  * @param SCOPE [scope] Scope of the definitions.
  * @param uh_key [type] Hash table key type.
  * @param uh_val [type] Hash table value type.
- * @param hash_func [(uh_key) -> uhash_uint] Hash function.
- * @param equal_func [(uh_key, uh_key) -> bool] Equality function.
+ * @param hash_func [(uh_key) -> uhash_uint] Hash function or expression.
+ * @param equal_func [(uh_key, uh_key) -> bool] Equality function or expression.
  */
-#define P_UHASH_IMPL(T, SCOPE, uh_key, uh_val, hash_func, equal_func)                               \
+#define P_UHASH_IMPL_COMMON(T, SCOPE, uh_key, uh_val, hash_func, equal_func)                        \
                                                                                                     \
     SCOPE void uhash_free_##T(UHash_##T *h) {                                                       \
         if (!h) return;                                                                             \
@@ -631,23 +682,6 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
         return true;                                                                                \
     }                                                                                               \
                                                                                                     \
-    SCOPE UHash_##T *uhset_alloc_##T(void) {                                                        \
-        UHash_##T *set = UHASH_MALLOC(sizeof(UHash_##T));                                           \
-                                                                                                    \
-        if (set) {                                                                                  \
-            *set = (UHash_##T) {                                                                    \
-                .n_buckets = 0,                                                                     \
-                .n_occupied = 0,                                                                    \
-                .count = 0,                                                                         \
-                .flags = NULL,                                                                      \
-                .keys = NULL,                                                                       \
-                .vals = NULL                                                                        \
-            };                                                                                      \
-        }                                                                                           \
-                                                                                                    \
-        return set;                                                                                 \
-    }                                                                                               \
-                                                                                                    \
     SCOPE uhash_ret uhset_insert_##T(UHash_##T *h, uh_key key, uh_key *existing) {                  \
         uhash_uint k;                                                                               \
         uhash_ret ret = uhash_put_##T(h, key, &k);                                                  \
@@ -724,34 +758,6 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
         return i == h->n_buckets ? if_empty : h->keys[i];                                           \
     }
 
-/*
- * Generates function definitions for the specified hash table type
- * with per-instance hash and equality functions.
- *
- * @param T [symbol] Hash table name.
- * @param SCOPE [scope] Scope of the definitions.
- * @param uh_key [type] Hash table key type.
- * @param uh_val [type] Hash table value type.
- */
-#define P_UHASH_IMPL_PI(T, SCOPE, uh_key, uh_val)                                                   \
-    P_UHASH_IMPL(T, SCOPE, uh_key, uh_val, h->hfunc, h->efunc)                                      \
-                                                                                                    \
-    SCOPE UHash_##T* uhmap_alloc_pi_##T(uhash_uint (*hash_func)(uh_key key),                        \
-                                        bool (*equal_func)(uh_key lhs, uh_key rhs)) {               \
-        UHash_##T *h = uhmap_alloc_##T();                                                           \
-        h->hfunc = hash_func;                                                                       \
-        h->efunc = equal_func;                                                                      \
-        return h;                                                                                   \
-    }                                                                                               \
-                                                                                                    \
-    SCOPE UHash_##T* uhset_alloc_pi_##T(uhash_uint (*hash_func)(uh_key key),                        \
-                                        bool (*equal_func)(uh_key lhs, uh_key rhs)) {               \
-        UHash_##T *h = uhset_alloc_##T();                                                           \
-        h->hfunc = hash_func;                                                                       \
-        h->efunc = equal_func;                                                                      \
-        return h;                                                                                   \
-    }
-
 // ##############
 // # Public API #
 // ##############
@@ -817,23 +823,27 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
  * Implements a previously declared hash table type.
  *
  * @param T [symbol] Hash table name.
- * @param hash_func [(uh_key) -> uhash_uint] Hash function.
- * @param equal_func [(uh_key, uh_key) -> bool] Equality function.
+ * @param hash_func [(uh_key) -> uhash_uint] Hash function or expression.
+ * @param equal_func [(uh_key, uh_key) -> bool] Equality function or expression.
  *
  * @public @related UHash
  */
-#define UHASH_IMPL(T, hash_func, equal_func) \
-    P_UHASH_IMPL(T, p_uhash_unused, uhash_##T##_key, uhash_##T##_val, hash_func, equal_func)
+#define UHASH_IMPL(T, hash_func, equal_func)                                                        \
+    P_UHASH_IMPL_ALLOC(T, p_uhash_unused)                                                           \
+    P_UHASH_IMPL_COMMON(T, p_uhash_unused, uhash_##T##_key, uhash_##T##_val, hash_func, equal_func)
 
 /**
  * Implements a previously declared hash table type with per-instance hash and equality functions.
  *
  * @param T [symbol] Hash table name.
+ * @param default_hfunc [(uh_key) -> uhash_uint] Default hash function (can be NULL).
+ * @param default_efunc [(uh_key, uh_key) -> bool] Default equality function (can be NULL).
  *
  * @public @related UHash
  */
-#define UHASH_IMPL_PI(T) \
-    P_UHASH_IMPL_PI(T, p_uhash_unused, uhash_##T##_key, uhash_##T##_val)
+#define UHASH_IMPL_PI(T, default_hfunc, default_efunc)                                              \
+    P_UHASH_IMPL_ALLOC_PI(T, p_uhash_unused, uhash_##T##_key, default_hfunc, default_efunc)         \
+    P_UHASH_IMPL_COMMON(T, p_uhash_unused, uhash_##T##_key, uhash_##T##_val, h->hfunc, h->efunc)
 
 /**
  * Defines a new static hash table type.
@@ -841,15 +851,16 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
  * @param T [symbol] Hash table name.
  * @param uh_key [symbol] Type of the keys.
  * @param uh_val [symbol] Type of the values.
- * @param hash_func [(uh_key) -> uhash_uint] Hash function.
- * @param equal_func [(uh_key, uh_key) -> bool] Equality function.
+ * @param hash_func [(uh_key) -> uhash_uint] Hash function or expression.
+ * @param equal_func [(uh_key, uh_key) -> bool] Equality function or expression.
  *
  * @public @related UHash
  */
 #define UHASH_INIT(T, uh_key, uh_val, hash_func, equal_func)                                        \
     P_UHASH_DEF_TYPE(T, uh_key, uh_val)                                                             \
     P_UHASH_DECL(T, p_uhash_static_inline, uh_key, uh_val)                                          \
-    P_UHASH_IMPL(T, p_uhash_static_inline, uh_key, uh_val, hash_func, equal_func)
+    P_UHASH_IMPL_ALLOC(T, p_uhash_static_inline)                                                    \
+    P_UHASH_IMPL_COMMON(T, p_uhash_static_inline, uh_key, uh_val, hash_func, equal_func)
 
 /**
  * Defines a new static hash table type with per-instance hash and equality functions.
@@ -857,13 +868,16 @@ p_uhash_static_inline uhash_uint p_uhash_x31_str_hash(char const *key) {
  * @param T [symbol] Hash table name.
  * @param uh_key [symbol] Type of the keys.
  * @param uh_val [symbol] Type of the values.
+ * @param default_hfunc [(uh_key) -> uhash_uint] Default hash function (can be NULL).
+ * @param default_efunc [(uh_key, uh_key) -> bool] Default equality function (can be NULL).
  *
  * @public @related UHash
  */
-#define UHASH_INIT_PI(T, uh_key, uh_val)                                                            \
+#define UHASH_INIT_PI(T, uh_key, uh_val, default_hfunc, default_efunc)                              \
     P_UHASH_DEF_TYPE_PI(T, uh_key, uh_val)                                                          \
     P_UHASH_DECL_PI(T, p_uhash_static_inline, uh_key, uh_val)                                       \
-    P_UHASH_IMPL_PI(T, p_uhash_static_inline, uh_key, uh_val)
+    P_UHASH_IMPL_ALLOC_PI(T, p_uhash_static_inline, uh_key, default_hfunc, default_efunc)           \
+    P_UHASH_IMPL_COMMON(T, p_uhash_static_inline, uh_key, uh_val, h->hfunc, h->efunc)
 
 /// @name Memory allocation
 

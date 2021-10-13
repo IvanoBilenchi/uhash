@@ -26,7 +26,7 @@
 /// @name Type definitions
 
 UHASH_INIT(IntHash, uint32_t, uint32_t, uhash_int32_hash, uhash_identical)
-UHASH_INIT_PI(IntHashPi, uint32_t, uint32_t)
+UHASH_INIT_PI(IntHashPi, uint32_t, uint32_t, NULL, NULL)
 
 static bool test_memory(void) {
     UHash(IntHash) *set = uhset_alloc(IntHash);
