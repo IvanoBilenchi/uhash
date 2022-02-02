@@ -1,5 +1,9 @@
 ## uHash - a type-safe, generic C hash table.
 
+### ⚠️ Important note ⚠️
+
+uHash is now part of the [uLib](https://github.com/IvanoBilenchi/ulib) library. All further development has moved there.
+
 ### Author
 
 [Ivano Bilenchi](https://ivanobilenchi.com)
